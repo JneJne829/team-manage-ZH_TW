@@ -58,6 +58,14 @@ class TeamService:
                         "error": "无法从 Token 中提取邮箱,请手动提供邮箱"
                     }
 
+            # ?? user_id????? null/None ???? 404
+            if not user_id or str(user_id).lower() == "null":
+                return {
+                    "success": False,
+                    "message": None,
+                    "error": "????? ID"
+                }
+
             # 2. 调用 ChatGPT API 获取账户信息
             account_result = await self.chatgpt_service.get_account_info(
                 access_token,
@@ -570,7 +578,7 @@ class TeamService:
             # 处理已加入成员
             for m in members_result["members"]:
                 all_members.append({
-                    "user_id": m.get("user_id"),
+                    "user_id": m.get("user_id") or m.get("id"),
                     "email": m.get("email"),
                     "name": m.get("name"),
                     "role": m.get("role"),
@@ -814,6 +822,14 @@ class TeamService:
                     "success": False,
                     "message": None,
                     "error": f"Team ID {team_id} 不存在"
+                }
+
+            # ?? user_id????? null/None ???? 404
+            if not user_id or str(user_id).lower() == 'null':
+                return {
+                    'success': False,
+                    'message': None,
+                    'error': '????? ID'
                 }
 
             # 2. 解密 AT Token

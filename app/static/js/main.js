@@ -562,6 +562,11 @@ async function handleAddMember(event) {
 }
 
 async function deleteMember(teamId, userId, email, inModal = false) {
+    if (!userId) {
+        showToast('???? ID?????????????', 'error');
+        return;
+    }
+
     if (!confirm(`確定要刪除成員 "${email}" 嗎？\n\n此操作無法復原！`)) {
         return;
     }
