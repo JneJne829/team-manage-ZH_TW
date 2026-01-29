@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}登入 - GPT Team 管理系統{% endblock %}
+
+{% block auth_content %}
+<div class="login-container">
+    <div class="login-box">
+        <h2>管理員登入</h2>
+        <form id="loginForm" onsubmit="handleLogin(event)">
+            <div class="form-group">
+                <label for="password">密碼</label>
+                <input
+                    type="password"
+                    id="password"
+                    name="password"
+                    class="form-control"
+                    placeholder="請輸入管理員密碼"
+                    required
+                    autocomplete="current-password"
+                >
+            </div>
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+            <button type="submit" class="btn btn-primary btn-block">登入</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+async function handleLogin(event) {
+    event.preventDefault();
+
+    const password = document.getElementById('password').value;
+    const errorMessage = document.getElementById('errorMessage');
+    const submitButton = event.target.querySelector('button[type="submit"]');
+
+    // 停用提交按鈕
+    submitButton.disabled = true;
+    submitButton.textContent = '登入中...';
+    errorMessage.style.display = 'none';
+
+    try {
+        const response = await fetch('/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ password })
+        });
+
+        const data = await response.json();
+
+        if (response.ok && data.success) {
+            // 登入成功，跳轉到管理員面板
+            window.location.href = '/admin';
+        } else {
+            // 顯示錯誤資訊
+            errorMessage.textContent = data.error || '登入失敗';
+            errorMessage.style.display = 'block';
+            submitButton.disabled = false;
+            submitButton.textContent = '登入';
+        }
+    } catch (error) {
+        errorMessage.textContent = '網路錯誤，請稍後重試';
+        errorMessage.style.display = 'block';
+        submitButton.disabled = false;
+        submitButton.textContent = '登入';
+    }
+}
+</script>
+{% endblock %}

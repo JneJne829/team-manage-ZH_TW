@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPT Team 兌換</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/user.css') }}">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>GPT Team 兌換</h1>
+            <p class="subtitle">使用兌換碼加入 ChatGPT Team</p>
+            {% if remaining_spots is not none %}
+            <div class="spots-badge">
+                <i data-lucide="users"></i> 剩餘名額：{{ remaining_spots }}
+            </div>
+            {% endif %}
+        </div>
+
+
+        <style>
+            .spots-badge {
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 6px 12px;
+                border-radius: 20px;
+                font-size: 0.9rem;
+                color: var(--primary-light);
+                margin-top: 10px;
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+        </style>
+
+        <!-- 步驟1: 輸入兌換碼 -->
+        <div id="step1" class="step active">
+            <div class="card">
+                <h2>輸入兌換資訊</h2>
+                <form id="verifyForm">
+                    <div class="form-group">
+                        <label for="email">電子郵件地址</label>
+                        <input type="email" id="email" name="email" required placeholder="請輸入您的電子郵件地址" class="form-input">
+                        <p class="form-help">請使用您的常用電子郵件，邀請將寄送到此信箱</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="code">兌換碼</label>
+                        <input type="text" id="code" name="code" required placeholder="請輸入兌換碼" class="form-input">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary" id="verifyBtn">
+                        <i data-lucide="shield-check"></i> 驗證兌換碼
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 步驟2: 選擇 Team（已廢棄，保留佔位符防止 JS 報錯） -->
+        <div id="step2" class="step" style="display: none;">
+            <div class="card">
+                <h2>選擇 Team</h2>
+                <div id="teamsList" class="teams-list"></div>
+                <div class="actions">
+                    <button onclick="backToStep1()" class="btn btn-secondary">返回</button>
+                    <button onclick="autoSelectTeam()" class="btn btn-primary">自動選擇</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步驟3: 兌換結果 -->
+        <div id="step3" class="step">
+            <div class="card">
+                <div id="resultContent">
+                    <!-- 結果內容將透過 JavaScript 動態生成 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div id="toast" class="toast"></div>
+
+    <script src="{{ url_for('static', path='/js/redeem.js') }}"></script>
+    <script>
+        if (window.lucide) lucide.createIcons();
+    </script>
+</body>
+
+</html>
