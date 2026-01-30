@@ -86,6 +86,32 @@
     <!-- Toast 提示 -->
     <div id="toast" class="toast"></div>
 
+    <!-- 系統公告彈出框 -->
+    <div id="announcementOverlay" class="announcement-overlay" aria-hidden="true">
+        <div class="announcement-card" role="dialog" aria-modal="true" aria-labelledby="announcementTitle">
+            <button id="announcementClose" class="announcement-close" aria-label="關閉公告">
+                <i data-lucide="x"></i>
+            </button>
+            <div class="announcement-pill">
+                <i data-lucide="megaphone"></i>
+                <span>系統公告</span>
+            </div>
+            <h3 id="announcementTitle" class="announcement-title">服務維護提醒（示範）</h3>
+            <p class="announcement-body">
+                這是一個測試用的公告彈窗，確保風格與頁面一致。您可以在這裡放入最新通知或系統訊息。
+            </p>
+            <div class="announcement-meta">
+                <span><i data-lucide="clock-3"></i> 更新時間：2026/01/30 12:00</span>
+                <span><i data-lucide="users"></i> 影響範圍：所有使用者</span>
+            </div>
+            <div class="announcement-actions">
+                <button id="announcementConfirm" class="btn btn-primary">
+                    <i data-lucide="check-circle-2"></i> 我知道了
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script src="{{ url_for('static', path='/js/redeem.js') }}"></script>
     <script>
         if (window.lucide) lucide.createIcons();

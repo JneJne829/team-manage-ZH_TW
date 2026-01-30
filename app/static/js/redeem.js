@@ -255,3 +255,46 @@ function formatDate(dateString) {
         return dateString;
     }
 }
+
+
+function initAnnouncementModal() {
+    const overlay = document.getElementById('announcementOverlay');
+    if (!overlay) return;
+
+    const closeBtn = document.getElementById('announcementClose');
+    const confirmBtn = document.getElementById('announcementConfirm');
+
+    const openModal = () => {
+        overlay.classList.add('show');
+        overlay.setAttribute('aria-hidden', 'false');
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    };
+
+    const closeModal = () => {
+        overlay.classList.remove('show');
+        overlay.setAttribute('aria-hidden', 'true');
+    };
+
+    closeBtn?.addEventListener('click', closeModal);
+    confirmBtn?.addEventListener('click', closeModal);
+    overlay.addEventListener('click', (event) => {
+        if (event.target === overlay) {
+            closeModal();
+        }
+    });
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') {
+            closeModal();
+        }
+    });
+
+    setTimeout(openModal, 450);
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAnnouncementModal);
+} else {
+    initAnnouncementModal();
+}
