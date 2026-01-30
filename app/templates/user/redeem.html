@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPT Team 免費群兌換</title>
+    <title>GPT Team 付費群兌換</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/css/user.css') }}">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -13,8 +13,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>GPT Team 免費群兌換</h1>
-            <p class="subtitle">使用兌換碼加入 ChatGPT Team 免費群</p>
+            <h1>GPT Team 付費群兌換</h1>
+            <p class="subtitle">使用兌換碼加入 ChatGPT Team 付費群</p>
             {% if remaining_spots is not none %}
             <div class="spots-badge">
                 <i data-lucide="users"></i> 剩餘名額：{{ remaining_spots }}
@@ -96,24 +96,14 @@
                 <i data-lucide="megaphone"></i>
                 <span>系統公告</span>
             </div>
-            <h3 id="announcementTitle" class="announcement-title">免費群公告</h3>
+            <h3 id="announcementTitle" class="announcement-title">付費群公告</h3>
             <p class="announcement-body">
-                本站屬於免費公益群，<br>任何擁有兌換碼的人都可以使用兌換碼加入。
+                本站屬於付費群，<br>請勿自行邀請用戶到被分配的工作區，後台有紀錄。<br>
+                付費群承諾兌換的工作區可使用到工作區被停用，<br>
+                如果工作區被停用還需要使用，則需要重新購買兌換碼。<br>
+                若用量較大，可參考以下方案
             </p>
             <ul class="announcement-list">
-                <li>
-                    <i data-lucide="alert-triangle"></i>
-                    <span>免費群可能不穩定，如需更穩定體驗請參考下方方案。</span>
-                </li>
-                <li class="announcement-plan">
-                    <i data-lucide="shield"></i>
-                    <div>
-                        <div class="plan-header">
-                            <span class="plan-name">穩定付費群</span>
-                            <span class="plan-price">$99 NT / 兌換碼</span>
-                        </div>
-                    </div>
-                </li>
                 <li class="announcement-plan">
                     <i data-lucide="infinity"></i>
                     <div>
@@ -131,7 +121,7 @@
             </ul>
             <div class="announcement-meta plain">
                 <span class="meta-line"><i data-lucide="clock-3"></i> 更新時間：2026/01/30</span>
-                <span class="meta-line"><i data-lucide="users"></i> 適用對象：持有兌換碼之使用者</span>
+                <span class="meta-line"><i data-lucide="users"></i> 適用對象：付費群之使用者</span>
             </div>
             <div class="announcement-actions">
                 <button id="announcementConfirm" class="btn btn-primary">
