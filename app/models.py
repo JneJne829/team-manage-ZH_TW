@@ -6,6 +6,7 @@ from sqlalchemy import Column, Integer, String, Text, Boolean, DateTime, Foreign
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
+from app.utils.time_utils import get_now
 
 
 class Team(Base):
@@ -23,9 +24,9 @@ class Team(Base):
     expires_at = Column(DateTime, comment="订阅到期时间")
     current_members = Column(Integer, default=0, comment="当前成员数")
     max_members = Column(Integer, default=6, comment="最大成员数")
-    status = Column(String(20), default="active", comment="状态: active/full/expired/error")
+    status = Column(String(20), default="active", comment="状态: active/full/expired/error/banned")
     last_sync = Column(DateTime, comment="最后同步时间")
-    created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
+    created_at = Column(DateTime, default=get_now, comment="创建时间")
 
     # 关系
     team_accounts = relationship("TeamAccount", back_populates="team", cascade="all, delete-orphan")
@@ -46,7 +47,7 @@ class TeamAccount(Base):
     account_id = Column(String(100), nullable=False, comment="Account ID")
     account_name = Column(String(255), comment="Account 名称")
     is_primary = Column(Boolean, default=False, comment="是否为主 Account")
-    created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
+    created_at = Column(DateTime, default=get_now, comment="创建时间")
 
     # 关系
     team = relationship("Team", back_populates="team_accounts")
@@ -63,12 +64,14 @@ class RedemptionCode(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     code = Column(String(32), unique=True, nullable=False, comment="兑换码")
-    status = Column(String(20), default="unused", comment="状态: unused/used/expired")
-    created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
+    status = Column(String(20), default="unused", comment="状态: unused/used/expired/warranty_active")
+    created_at = Column(DateTime, default=get_now, comment="创建时间")
     expires_at = Column(DateTime, comment="过期时间")
     used_by_email = Column(String(255), comment="使用者邮箱")
     used_team_id = Column(Integer, ForeignKey("teams.id"), comment="使用的 Team ID")
     used_at = Column(DateTime, comment="使用时间")
+    has_warranty = Column(Boolean, default=False, comment="是否为质保兑换码")
+    warranty_expires_at = Column(DateTime, comment="质保到期时间(首次使用后一个月)")
 
     # 关系
     redemption_records = relationship("RedemptionRecord", back_populates="redemption_code")
@@ -88,7 +91,8 @@ class RedemptionRecord(Base):
     code = Column(String(32), ForeignKey("redemption_codes.code"), nullable=False, comment="兑换码")
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, comment="Team ID")
     account_id = Column(String(100), nullable=False, comment="Account ID")
-    redeemed_at = Column(DateTime, server_default=func.now(), comment="兑换时间")
+    redeemed_at = Column(DateTime, default=get_now, comment="兑换时间")
+    is_warranty_redemption = Column(Boolean, default=False, comment="是否为质保兑换")
 
     # 关系
     team = relationship("Team", back_populates="redemption_records")
@@ -108,8 +112,8 @@ class Setting(Base):
     key = Column(String(100), unique=True, nullable=False, comment="配置项名称")
     value = Column(Text, comment="配置项值")
     description = Column(String(255), comment="配置项描述")
-    created_at = Column(DateTime, server_default=func.now(), comment="创建时间")
-    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), comment="更新时间")
+    created_at = Column(DateTime, default=get_now, comment="创建时间")
+    updated_at = Column(DateTime, default=get_now, onupdate=get_now, comment="更新时间")
 
     # 索引
     __table_args__ = (

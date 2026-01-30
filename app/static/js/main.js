@@ -1,8 +1,8 @@
-/**
+﻿/**
  * GPT Team 管理系統 - 通用 JavaScript
  */
 
-// Toast 提示函數
+// Toast 提示函式
 function showToast(message, type = 'info') {
     const toast = document.getElementById('toast');
     if (!toast) return;
@@ -23,7 +23,7 @@ function showToast(message, type = 'info') {
     }, 3000);
 }
 
-// 日期格式化函數
+// 日期格式化函式
 function formatDateTime(dateString) {
     if (!dateString) return '-';
 
@@ -37,7 +37,7 @@ function formatDateTime(dateString) {
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
 
-// 登出函數
+// 登出函式
 async function logout() {
     if (!confirm('確定要登出嗎？')) {
         return;
@@ -123,7 +123,7 @@ function showModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.classList.add('show');
-        document.body.style.overflow = 'hidden'; // 防止背景捲動
+        document.body.style.overflow = 'hidden'; // 防止背景滾動
     }
 }
 
@@ -204,56 +204,120 @@ async function handleBatchImport(event) {
     const form = event.target;
     const batchContent = form.batchContent.value.trim();
     const submitButton = form.querySelector('button[type="submit"]');
+
+    // UI 元素
+    const progressContainer = document.getElementById('batchProgressContainer');
+    const progressBar = document.getElementById('batchProgressBar');
+    const progressStage = document.getElementById('batchProgressStage');
+    const progressPercent = document.getElementById('batchProgressPercent');
+    const successCountEl = document.getElementById('batchSuccessCount');
+    const failedCountEl = document.getElementById('batchFailedCount');
     const resultsContainer = document.getElementById('batchResultsContainer');
     const resultsDiv = document.getElementById('batchResults');
+    const finalSummaryEl = document.getElementById('batchFinalSummary');
+
+    // 重置 UI
+    progressContainer.style.display = 'block';
+    resultsContainer.style.display = 'none';
+    progressBar.style.width = '0%';
+    progressStage.textContent = '準備匯入...';
+    progressPercent.textContent = '0%';
+    successCountEl.textContent = '0';
+    failedCountEl.textContent = '0';
+    resultsDiv.innerHTML = '<table class="data-table"><thead><tr><th>信箱</th><th>狀態</th><th>訊息</th></tr></thead><tbody id="batchResultsBody"></tbody></table>';
+    const resultsBody = document.getElementById('batchResultsBody');
 
     submitButton.disabled = true;
     submitButton.textContent = '匯入中...';
 
     try {
-        const result = await apiCall('/admin/teams/import', {
+        const response = await fetch('/admin/teams/import', {
             method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
                 import_type: 'batch',
                 content: batchContent
             })
         });
 
-        if (result.success) {
-            const data = result.data;
-            let html = `<div class="batch-summary">
-                <p>總數：${data.total} | 成功：<span class="text-success">${data.success_count}</span> | 失敗：<span class="text-danger">${data.failed_count}</span></p>
-            </div>`;
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || errorData.detail || '請求失敗');
+        }
 
-            if (data.results && data.results.length > 0) {
-                html += '<div class="batch-results"><table class="data-table"><thead><tr><th>電子郵件</th><th>狀態</th><th>訊息</th></tr></thead><tbody>';
-                data.results.forEach(res => {
-                    const statusClass = res.success ? 'text-success' : 'text-danger';
-                    const statusText = res.success ? '成功' : '失敗';
-                    html += `<tr>
-                        <td>${res.email}</td>
-                        <td class="${statusClass}">${statusText}</td>
-                        <td>${res.success ? res.message : res.error}</td>
-                    </tr>`;
-                });
-                html += '</tbody></table></div>';
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // 最後一個可能是殘缺的
+
+            for (const line of lines) {
+                if (!line.trim()) continue;
+                try {
+                    const data = JSON.parse(line);
+
+                    if (data.type === 'start') {
+                        progressStage.textContent = `開始匯入 (共 ${data.total} 條)...`;
+                    } else if (data.type === 'progress') {
+                        const percent = Math.round((data.current / data.total) * 100);
+                        progressBar.style.width = `${percent}%`;
+                        progressPercent.textContent = `${percent}%`;
+                        progressStage.textContent = `正在匯入 ${data.current}/${data.total}...`;
+                        successCountEl.textContent = data.success_count;
+                        failedCountEl.textContent = data.failed_count;
+
+                        // 即時新增到詳細列表
+                        if (data.last_result) {
+                            resultsContainer.style.display = 'block';
+                            const res = data.last_result;
+                            const statusClass = res.success ? 'text-success' : 'text-danger';
+                            const statusText = res.success ? '成功' : '失敗';
+                            const row = document.createElement('tr');
+                            row.innerHTML = `
+                                <td>${res.email}</td>
+                                <td class="${statusClass}">${statusText}</td>
+                                <td>${res.success ? (res.message || '匯入成功') : res.error}</td>
+                            `;
+                            // 插入到最前面，方便看到最新的
+                            resultsBody.insertBefore(row, resultsBody.firstChild);
+                        }
+                    } else if (data.type === 'finish') {
+                        progressStage.textContent = '匯入完成';
+                        progressBar.style.width = '100%';
+                        progressPercent.textContent = '100%';
+                        finalSummaryEl.textContent = `總數: ${data.total} | 成功: ${data.success_count} | 失敗: ${data.failed_count}`;
+
+                        if (data.failed_count === 0) {
+                            showToast('全部匯入成功！', 'success');
+                        } else {
+                            showToast(`匯入完成，成功 ${data.success_count} 條，失敗 ${data.failed_count} 條`, 'warning');
+                        }
+
+                        // 重新整理頁面以顯示新資料
+                        if (data.success_count > 0) {
+                            setTimeout(() => location.reload(), 3000);
+                        }
+                    } else if (data.type === 'error') {
+                        showToast(data.error, 'error');
+                    }
+                } catch (e) {
+                    console.error('解析串流資料失敗:', e, line);
+                }
             }
-
-            resultsDiv.innerHTML = html;
-            resultsContainer.style.display = 'block';
-
-            if (data.failed_count === 0) {
-                showToast('全部匯入成功！', 'success');
-                setTimeout(() => location.reload(), 2000);
-            }
-        } else {
-            showToast(result.error || '批次匯入失敗', 'error');
         }
     } catch (error) {
-        showToast('網路錯誤', 'error');
+        showToast(error.message || '網路錯誤', 'error');
     } finally {
         submitButton.disabled = false;
-        submitButton.textContent = '批次匯入';
+        submitButton.textContent = '批量匯入';
     }
 }
 
@@ -264,8 +328,9 @@ async function generateSingle(event) {
     const form = event.target;
     const customCode = form.customCode.value.trim();
     const expiresDays = form.expiresDays.value;
+    const hasWarranty = form.hasWarranty.checked;
 
-    const data = { type: 'single' };
+    const data = { type: 'single', has_warranty: hasWarranty };
     if (customCode) data.code = customCode;
     if (expiresDays) data.expires_days = parseInt(expiresDays);
 
@@ -293,13 +358,14 @@ async function generateBatch(event) {
     const form = event.target;
     const count = parseInt(form.count.value);
     const expiresDays = form.expiresDays.value;
+    const hasWarranty = form.hasWarranty.checked;
 
     if (count < 1 || count > 1000) {
         showToast('產生數量必須在 1-1000 之間', 'error');
         return;
     }
 
-    const data = { type: 'batch', count: count };
+    const data = { type: 'batch', count: count, has_warranty: hasWarranty };
     if (expiresDays) data.expires_days = parseInt(expiresDays);
 
     const result = await apiCall('/admin/codes/generate', {
@@ -312,7 +378,7 @@ async function generateBatch(event) {
         document.getElementById('batchCodes').value = result.data.codes.join('\n');
         document.getElementById('batchResult').style.display = 'block';
         form.reset();
-        showToast(`成功產生 ${result.data.total} 組兌換碼`, 'success');
+        showToast(`成功產生 ${result.data.total} 個兌換碼`, 'success');
         if (window.location.pathname === '/admin/codes') {
             setTimeout(() => location.reload(), 3000);
         }
@@ -321,7 +387,7 @@ async function generateBatch(event) {
     }
 }
 
-// 統一複製到剪貼簿函數
+// 統一複製到剪貼簿函式
 async function copyToClipboard(text) {
     if (!text) return;
 
@@ -336,7 +402,7 @@ async function copyToClipboard(text) {
         console.error('Modern copy failed:', err);
     }
 
-    // 備援：使用 textarea 方式
+    // Fallback: 使用 textarea 方式
     try {
         const textArea = document.createElement("textarea");
         textArea.value = text;
@@ -366,7 +432,7 @@ async function copyToClipboard(text) {
     return false;
 }
 
-// === 輔助函數 ===
+// === 輔助函式 ===
 
 function copyCode(code) {
     // 如果沒有傳入 code，嘗試從產生結果中取得
@@ -410,7 +476,7 @@ async function viewMembers(teamId, teamEmail = '') {
     // 設定基本資訊
     document.getElementById('modalTeamEmail').textContent = teamEmail;
 
-    // 打開模態框
+    // 開啟模態框
     showModal('manageMembersModal');
 
     // 載入成員列表
@@ -544,7 +610,7 @@ async function handleAddMember(event) {
         if (result.success) {
             showToast('成員新增成功！', 'success');
             form.reset();
-            // 在模態框模式下，只需重新載入列表
+            // 在模態框模式下，只載入列表
             if (document.getElementById('manageMembersModal').classList.contains('show')) {
                 await loadModalMemberList(teamId);
             } else {
@@ -562,12 +628,7 @@ async function handleAddMember(event) {
 }
 
 async function deleteMember(teamId, userId, email, inModal = false) {
-    if (!userId) {
-        showToast('???? ID?????????????', 'error');
-        return;
-    }
-
-    if (!confirm(`確定要刪除成員 "${email}" 嗎？\n\n此操作無法復原！`)) {
+    if (!confirm(`確定要刪除成員 "${email}" 嗎？\n\n此操作不可恢復！`)) {
         return;
     }
 
@@ -591,3 +652,6 @@ async function deleteMember(teamId, userId, email, inModal = false) {
         showToast('網路錯誤', 'error');
     }
 }
+
+
+

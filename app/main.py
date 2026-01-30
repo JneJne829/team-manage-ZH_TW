@@ -13,7 +13,7 @@ from datetime import datetime
 
 from contextlib import asynccontextmanager
 # 导入路由
-from app.routes import redeem, auth, admin, api, user
+from app.routes import redeem, auth, admin, api, user, warranty
 from app.config import settings
 from app.database import init_db, close_db, AsyncSessionLocal
 from app.services.auth import auth_service
@@ -38,7 +38,12 @@ async def lifespan(app: FastAPI):
         
         # 1. 创建数据库表
         await init_db()
-        # 2. 初始化管理员密码（如果不存在）
+        
+        # 2. 运行自动数据库迁移
+        from app.db_migrations import run_auto_migration
+        run_auto_migration()
+        
+        # 3. 初始化管理员密码（如果不存在）
         async with AsyncSessionLocal() as session:
             await auth_service.initialize_admin_password(session)
         logger.info("数据库初始化完成")
@@ -99,9 +104,22 @@ def format_datetime(dt):
         return "-"
     if isinstance(dt, str):
         try:
-            dt = datetime.fromisoformat(dt.replace("+00:00", ""))
+            # 兼容包含时区信息的字符串
+            dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
         except:
             return dt
+    
+    # 统一转换为北京时间显示 (如果它是 aware datetime)
+    import pytz
+    from app.config import settings
+    if dt.tzinfo is None:
+        # 如果是 naive datetime，假设它是本地时区（CST）的时间
+        pass
+    else:
+        # 如果是 aware datetime，转换为目标时区
+        tz = pytz.timezone(settings.timezone)
+        dt = dt.astimezone(tz)
+        
     return dt.strftime("%Y-%m-%d %H:%M")
 
 def escape_js(value):
@@ -123,6 +141,7 @@ logger = logging.getLogger(__name__)
 # 注册路由
 app.include_router(user.router)  # 用户路由(根路径)
 app.include_router(redeem.router)
+app.include_router(warranty.router)
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(api.router)
@@ -147,7 +166,7 @@ if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=8008,
-        reload=True
+        host=settings.app_host,
+        port=settings.app_port,
+        reload=settings.debug
     )

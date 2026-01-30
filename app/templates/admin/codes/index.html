@@ -7,13 +7,13 @@
     <h2>兌換碼管理</h2>
 </div>
 
-<!-- 统计卡片 -->
+<!-- 統計 -->
 <div class="stats-container">
     <div class="stat-card">
-        <div class="stat-icon">🎫</div>
+        <div class="stat-icon">📦</div>
         <div class="stat-content">
             <div class="stat-value">{{ stats.total }}</div>
-            <div class="stat-label">兌換碼總數</div>
+            <div class="stat-label">總數</div>
         </div>
     </div>
     <div class="stat-card stat-success">
@@ -24,7 +24,7 @@
         </div>
     </div>
     <div class="stat-card stat-info">
-        <div class="stat-icon">📝</div>
+        <div class="stat-icon">🪪</div>
         <div class="stat-content">
             <div class="stat-value">{{ stats.used }}</div>
             <div class="stat-label">已使用</div>
@@ -34,26 +34,46 @@
         <div class="stat-icon">⏰</div>
         <div class="stat-content">
             <div class="stat-value">{{ stats.expired }}</div>
-            <div class="stat-label">已過期</div>
+            <div class="stat-label">已到期</div>
         </div>
     </div>
 </div>
 
-<!-- 操作栏 -->
+<!-- 篩選 / 操作 -->
 <div class="section-header">
-    <div class="filter-buttons">
-        <button onclick="filterByStatus('all')" class="btn btn-sm btn-secondary active" id="filter-all">全部</button>
-        <button onclick="filterByStatus('unused')" class="btn btn-sm btn-success" id="filter-unused">未使用</button>
-        <button onclick="filterByStatus('used')" class="btn btn-sm btn-info" id="filter-used">已使用</button>
-        <button onclick="filterByStatus('expired')" class="btn btn-sm btn-danger" id="filter-expired">已過期</button>
+    <div class="header-group">
+        <div class="filter-tabs">
+            <button onclick="filterByStatus('all')" class="filter-tab active" id="filter-all">全部</button>
+            <button onclick="filterByStatus('unused')" class="filter-tab" id="filter-unused">未使用</button>
+            <button onclick="filterByStatus('used')" class="filter-tab" id="filter-used">已使用</button>
+            <button onclick="filterByStatus('expired')" class="filter-tab" id="filter-expired">已到期</button>
+        </div>
+
+        <form action="/admin/codes" method="get" class="search-form">
+            <div class="input-group-clean">
+                <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                <input type="text" name="search" value="{{ search or '' }}" placeholder="搜尋兌換碼或 Email..."
+                    style="width: 180px;">
+                {% if search %}
+                <a href="/admin/codes" title="清除搜尋">
+                    <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i>
+                </a>
+                {% endif %}
+            </div>
+        </form>
     </div>
-    <div class="action-buttons">
-        <button onclick="showModal('generateCodeModal')" class="btn btn-primary">產生兌換碼</button>
-        <button onclick="exportCodes()" class="btn btn-secondary">匯出兌換碼</button>
+
+    <div class="header-group">
+        <button onclick="showModal('generateCodeModal')" class="btn btn-primary">
+            <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> 產生兌換碼
+        </button>
+        <button onclick="exportCodes()" class="btn btn-secondary">
+            <i data-lucide="download" style="width: 16px; height: 16px;"></i> 匯出
+        </button>
     </div>
 </div>
 
-<!-- 兑换码列表 -->
+<!-- 列表 -->
 <div class="content-section">
     {% if codes %}
     <div class="table-container">
@@ -64,8 +84,9 @@
                     <th>狀態</th>
                     <th>建立時間</th>
                     <th>到期時間</th>
-                    <th>使用者信箱</th>
+                    <th>使用者 Email</th>
                     <th>使用時間</th>
+                    <th>保固</th>
                     <th style="text-align: right;">操作</th>
                 </tr>
             </thead>
@@ -83,24 +104,40 @@
                         <span class="status-badge status-active">未使用</span>
                         {% elif code.status == 'used' %}
                         <span class="status-badge status-full">已使用</span>
+                        {% elif code.status == 'warranty_active' %}
+                        <span class="status-badge status-info">保固中</span>
                         {% elif code.status == 'expired' %}
-                        <span class="status-badge status-error">已過期</span>
+                        <span class="status-badge status-error">已到期</span>
+                        {% else %}
+                        <span class="status-badge status-error">未知</span>
                         {% endif %}
                     </td>
                     <td>{{ code.created_at }}</td>
-                    <td>{{ code.expires_at if code.expires_at else '永久有效' }}</td>
+                    <td>{{ code.expires_at if code.expires_at else '無到期日' }}</td>
                     <td>{{ code.used_by_email if code.used_by_email else '-' }}</td>
                     <td>{{ code.used_at if code.used_at else '-' }}</td>
+                    <td>
+                        {% if code.has_warranty %}
+                        <span class="status-badge status-info">有</span>
+                        {% else %}
+                        <span class="status-badge" style="background: #f3f4f6; color: #6b7280;">無</span>
+                        {% endif %}
+                    </td>
                     <td style="text-align: right;">
                         <div class="action-buttons" style="justify-content: flex-end;">
-                            <button onclick="copyCode('{{ code.code }}')" class="btn btn-sm btn-secondary" title="複製">
-                                <i data-lucide="copy"></i>
+                            <button class="btn btn-xs btn-icon btn-minimal" onclick="copyCode('{{ code.code }}')"
+                                title="複製">
+                                <i data-lucide="copy" style="width: 14px; height: 14px;"></i>
                             </button>
-                            {% if code.status == 'unused' %}
-                            <button onclick="deleteCode('{{ code.code }}')" class="btn btn-sm btn-danger" title="刪除">
-                                <i data-lucide="trash-2"></i> 刪除
+                            <button class="btn btn-xs btn-icon btn-minimal btn-info"
+                                onclick="editCode('{{ code.code }}', {{ 'true' if code.has_warranty else 'false' }})"
+                                title="編輯保固">
+                                <i data-lucide="shield" style="width: 14px; height: 14px;"></i>
                             </button>
-                            {% endif %}
+                            <button class="btn btn-xs btn-icon btn-minimal btn-danger"
+                                onclick="deleteCode('{{ code.code }}')" title="刪除">
+                                <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -110,32 +147,43 @@
     </div>
     {% else %}
     <div class="empty-state">
-        <i data-lucide="package-open" style="width: 48px; height: 48px; margin-bottom: 1rem; opacity: 0.2;"></i>
-        <p>暫無兌換碼資料</p>
+        <p>目前沒有兌換碼</p>
         <button onclick="showModal('generateCodeModal')" class="btn btn-primary">立即產生</button>
     </div>
     {% endif %}
+</div>
+
+<!-- 編輯保固 Modal -->
+<div id="editCodeModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>編輯保固</h3>
+            <button class="modal-close" onclick="hideModal('editCodeModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="editCodeForm" onsubmit="handleEditCode(event)">
+                <input type="hidden" id="edit-code">
+                <div class="form-group">
+                    <label>兌換碼</label>
+                    <input type="text" id="edit-code-display" class="form-control" disabled>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" id="edit-has-warranty" style="width: auto; margin: 0;">
+                    <label for="edit-has-warranty" style="margin: 0;">啟用保固 (可重複使用)</label>
+                </div>
+                <button type="submit" class="btn btn-primary">儲存</button>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // 当前筛选状态
-    let currentFilter = 'all';
-
-    // 按状态筛选
     function filterByStatus(status) {
-        currentFilter = status;
-
-        // 更新按钮状态
-        document.querySelectorAll('.filter-buttons .btn').forEach(btn => {
-            btn.classList.remove('active');
-        });
+        document.querySelectorAll('.filter-tab').forEach(btn => btn.classList.remove('active'));
         document.getElementById(`filter-${status}`).classList.add('active');
-
-        // 筛选表格行
-        const rows = document.querySelectorAll('#codesTableBody tr');
-        rows.forEach(row => {
+        document.querySelectorAll('#codesTableBody tr').forEach(row => {
             const rowStatus = row.getAttribute('data-status');
             if (status === 'all' || rowStatus === status) {
                 row.style.display = '';
@@ -145,58 +193,62 @@
         });
     }
 
-    // 刪除兌換碼
+    function copyCode(code) {
+        navigator.clipboard.writeText(code).then(() => {
+            showToast('已複製到剪貼簿', 'success');
+        }).catch(() => {
+            showToast('複製失敗，請手動複製', 'error');
+        });
+    }
+
+    function exportCodes() {
+        window.location.href = '/admin/codes/export{% if search %}?search={{ search }}{% endif %}';
+    }
+
     async function deleteCode(code) {
-        if (!confirm(`確定要刪除兌換碼 ${code} 嗎？`)) {
-            return;
-        }
-
+        if (!confirm(`確定刪除兌換碼「${code}」？`)) return;
         try {
-            const response = await fetch(`/admin/codes/${encodeURIComponent(code)}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-
+            showToast('刪除中...', 'info');
+            const response = await fetch(`/admin/codes/${encodeURIComponent(code)}/delete`, { method: 'POST' });
             const result = await response.json();
-
             if (response.ok && result.success) {
-                showToast('刪除成功', 'success');
-                // 刷新页面
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+                showToast('已刪除', 'success');
+                setTimeout(() => window.location.reload(), 800);
             } else {
                 showToast(result.error || '刪除失敗', 'error');
             }
         } catch (error) {
-            showToast('網路錯誤', 'error');
+            showToast('發生錯誤，請稍後再試', 'error');
         }
     }
 
+    function editCode(code, hasWarranty) {
+        document.getElementById('edit-code').value = code;
+        document.getElementById('edit-code-display').value = code;
+        document.getElementById('edit-has-warranty').checked = hasWarranty;
+        showModal('editCodeModal');
+    }
 
-    // 匯出兌換碼
-    async function exportCodes() {
+    async function handleEditCode(event) {
+        event.preventDefault();
+        const code = document.getElementById('edit-code').value;
+        const has_warranty = document.getElementById('edit-has-warranty').checked;
         try {
-            const response = await fetch('/admin/codes/export');
-
-            if (response.ok) {
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `redemption_codes_${new Date().getTime()}.xlsx`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-                showToast('匯出成功', 'success');
+            const response = await fetch(`/admin/codes/${encodeURIComponent(code)}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ has_warranty })
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showToast('已更新', 'success');
+                hideModal('editCodeModal');
+                setTimeout(() => window.location.reload(), 800);
             } else {
-                showToast('匯出失敗', 'error');
+                showToast(result.error || '更新失敗', 'error');
             }
         } catch (error) {
-            showToast('網路錯誤', 'error');
+            showToast('發生錯誤，請稍後再試', 'error');
         }
     }
 </script>

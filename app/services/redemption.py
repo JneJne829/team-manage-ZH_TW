@@ -7,11 +7,12 @@ import secrets
 import string
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta
-from sqlalchemy import select, update, delete, and_, or_
+from sqlalchemy import select, update, delete, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models import RedemptionCode, RedemptionRecord, Team
+from app.utils.time_utils import get_now
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,8 @@ class RedemptionService:
         self,
         db_session: AsyncSession,
         code: Optional[str] = None,
-        expires_days: Optional[int] = None
+        expires_days: Optional[int] = None,
+        has_warranty: bool = False
     ) -> Dict[str, Any]:
         """
         生成单个兑换码
@@ -59,6 +61,7 @@ class RedemptionService:
             db_session: 数据库会话
             code: 自定义兑换码 (可选,如果不提供则自动生成)
             expires_days: 有效期天数 (可选,如果不提供则永久有效)
+            has_warranty: 是否为质保兑换码 (默认 False)
 
         Returns:
             结果字典,包含 success, code, message, error
@@ -102,13 +105,14 @@ class RedemptionService:
             # 2. 计算过期时间
             expires_at = None
             if expires_days:
-                expires_at = datetime.now() + timedelta(days=expires_days)
+                expires_at = get_now() + timedelta(days=expires_days)
 
             # 3. 创建兑换码记录
             redemption_code = RedemptionCode(
                 code=code,
                 status="unused",
-                expires_at=expires_at
+                expires_at=expires_at,
+                has_warranty=has_warranty
             )
 
             db_session.add(redemption_code)
@@ -137,7 +141,8 @@ class RedemptionService:
         self,
         db_session: AsyncSession,
         count: int,
-        expires_days: Optional[int] = None
+        expires_days: Optional[int] = None,
+        has_warranty: bool = False
     ) -> Dict[str, Any]:
         """
         批量生成兑换码
@@ -146,6 +151,7 @@ class RedemptionService:
             db_session: 数据库会话
             count: 生成数量
             expires_days: 有效期天数 (可选)
+            has_warranty: 是否为质保兑换码 (默认 False)
 
         Returns:
             结果字典,包含 success, codes, total, message, error
@@ -163,7 +169,7 @@ class RedemptionService:
             # 计算过期时间
             expires_at = None
             if expires_days:
-                expires_at = datetime.now() + timedelta(days=expires_days)
+                expires_at = get_now() + timedelta(days=expires_days)
 
             # 批量生成兑换码
             codes = []
@@ -191,7 +197,8 @@ class RedemptionService:
                 redemption_code = RedemptionCode(
                     code=code,
                     status="unused",
-                    expires_at=expires_at
+                    expires_at=expires_at,
+                    has_warranty=has_warranty
                 )
                 db_session.add(redemption_code)
 
@@ -249,18 +256,19 @@ class RedemptionService:
                 }
 
             # 2. 检查状态
-            if redemption_code.status != "unused":
+            if redemption_code.status not in ["unused", "warranty_active"]:
+                reason = "兑换码已被使用" if redemption_code.status == "used" else f"兑换码已{redemption_code.status}"
                 return {
                     "success": True,
                     "valid": False,
-                    "reason": f"兑换码已{redemption_code.status}",
+                    "reason": reason,
                     "redemption_code": None,
                     "error": None
                 }
 
             # 3. 检查是否过期
             if redemption_code.expires_at:
-                if redemption_code.expires_at < datetime.now():
+                if redemption_code.expires_at < get_now():
                     # 更新状态为 expired
                     redemption_code.status = "expired"
                     await db_session.commit()
@@ -345,7 +353,7 @@ class RedemptionService:
             redemption_code.status = "used"
             redemption_code.used_by_email = email
             redemption_code.used_team_id = team_id
-            redemption_code.used_at = datetime.now()
+            redemption_code.used_at = get_now()
 
             # 3. 创建使用记录
             redemption_record = RedemptionRecord(
@@ -377,19 +385,53 @@ class RedemptionService:
 
     async def get_all_codes(
         self,
-        db_session: AsyncSession
+        db_session: AsyncSession,
+        page: int = 1,
+        per_page: int = 50,
+        search: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         获取所有兑换码
 
         Args:
             db_session: 数据库会话
+            page: 页码
+            per_page: 每页数量
+            search: 搜索关键词 (兑换码或邮箱)
 
         Returns:
-            结果字典,包含 success, codes, total, error
+            结果字典,包含 success, codes, total, total_pages, current_page, error
         """
         try:
+            # 1. 构建基础查询
+            count_stmt = select(func.count(RedemptionCode.id))
             stmt = select(RedemptionCode).order_by(RedemptionCode.created_at.desc())
+
+            # 2. 如果提供了搜索关键词,添加过滤条件
+            if search:
+                search_filter = or_(
+                    RedemptionCode.code.ilike(f"%{search}%"),
+                    RedemptionCode.used_by_email.ilike(f"%{search}%")
+                )
+                count_stmt = count_stmt.where(search_filter)
+                stmt = stmt.where(search_filter)
+
+            # 3. 获取总数
+            count_result = await db_session.execute(count_stmt)
+            total = count_result.scalar() or 0
+
+            # 4. 计算分页
+            import math
+            total_pages = math.ceil(total / per_page) if total > 0 else 1
+            if page < 1:
+                page = 1
+            if page > total_pages and total_pages > 0:
+                page = total_pages
+            
+            offset = (page - 1) * per_page
+
+            # 5. 查询分页数据
+            stmt = stmt.limit(per_page).offset(offset)
             result = await db_session.execute(stmt)
             codes = result.scalars().all()
 
@@ -404,15 +446,19 @@ class RedemptionService:
                     "expires_at": code.expires_at.isoformat() if code.expires_at else None,
                     "used_by_email": code.used_by_email,
                     "used_team_id": code.used_team_id,
-                    "used_at": code.used_at.isoformat() if code.used_at else None
+                    "used_at": code.used_at.isoformat() if code.used_at else None,
+                    "has_warranty": code.has_warranty,
+                    "warranty_expires_at": code.warranty_expires_at.isoformat() if code.warranty_expires_at else None
                 })
 
-            logger.info(f"获取所有兑换码成功: 共 {len(code_list)} 个")
+            logger.info(f"获取所有兑换码成功: 第 {page} 页, 共 {len(code_list)} 个 / 总数 {total}")
 
             return {
                 "success": True,
                 "codes": code_list,
-                "total": len(code_list),
+                "total": total,
+                "total_pages": total_pages,
+                "current_page": page,
                 "error": None
             }
 
@@ -527,19 +573,40 @@ class RedemptionService:
 
     async def get_all_records(
         self,
-        db_session: AsyncSession
+        db_session: AsyncSession,
+        email: Optional[str] = None,
+        code: Optional[str] = None,
+        team_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        获取所有兑换记录
+        获取所有兑换记录 (支持筛选)
 
         Args:
             db_session: 数据库会话
+            email: 邮箱模糊搜索
+            code: 兑换码模糊搜索
+            team_id: Team ID 筛选
 
         Returns:
             结果字典,包含 success, records, total, error
         """
         try:
-            stmt = select(RedemptionRecord).order_by(RedemptionRecord.redeemed_at.desc())
+            stmt = select(RedemptionRecord)
+            
+            # 添加筛选条件
+            filters = []
+            if email:
+                filters.append(RedemptionRecord.email.ilike(f"%{email}%"))
+            if code:
+                filters.append(RedemptionRecord.code.ilike(f"%{code}%"))
+            if team_id:
+                filters.append(RedemptionRecord.team_id == team_id)
+                
+            if filters:
+                stmt = stmt.where(and_(*filters))
+                
+            stmt = stmt.order_by(RedemptionRecord.redeemed_at.desc())
+            
             result = await db_session.execute(stmt)
             records = result.scalars().all()
 
@@ -620,6 +687,59 @@ class RedemptionService:
                 "success": False,
                 "message": None,
                 "error": f"删除兑换码失败: {str(e)}"
+            }
+
+    async def update_code(
+        self,
+        code: str,
+        db_session: AsyncSession,
+        has_warranty: Optional[bool] = None
+    ) -> Dict[str, Any]:
+        """
+        更新兑换码信息
+
+        Args:
+            code: 兑换码
+            db_session: 数据库会话
+            has_warranty: 是否为质保兑换码 (可选)
+
+        Returns:
+            结果字典,包含 success, message, error
+        """
+        try:
+            # 查询兑换码
+            stmt = select(RedemptionCode).where(RedemptionCode.code == code)
+            result = await db_session.execute(stmt)
+            redemption_code = result.scalar_one_or_none()
+
+            if not redemption_code:
+                return {
+                    "success": False,
+                    "message": None,
+                    "error": f"兑换码 {code} 不存在"
+                }
+
+            # 更新质保状态
+            if has_warranty is not None:
+                redemption_code.has_warranty = has_warranty
+
+            await db_session.commit()
+
+            logger.info(f"更新兑换码成功: {code}")
+
+            return {
+                "success": True,
+                "message": f"兑换码 {code} 已更新",
+                "error": None
+            }
+
+        except Exception as e:
+            await db_session.rollback()
+            logger.error(f"更新兑换码失败: {e}")
+            return {
+                "success": False,
+                "message": None,
+                "error": f"更新兑换码失败: {str(e)}"
             }
 
 

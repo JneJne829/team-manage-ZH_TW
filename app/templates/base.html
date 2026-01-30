@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-TW">
 
 <head>
@@ -13,7 +13,7 @@
 
 <body class="theme-premium-dark">
     {% if user %}
-    <!-- 導覽列 -->
+    <!-- 導航欄 -->
     <nav class="navbar">
         <div class="navbar-container">
             <div class="navbar-brand">
@@ -34,7 +34,7 @@
                 <li class="menu-item {% if active_page == 'dashboard' %}active{% endif %}">
                     <a href="/admin">
                         <span class="menu-icon" data-lucide="layout-dashboard"></span>
-                        <span class="menu-text">控制台</span>
+                        <span class="menu-text">主控台</span>
                     </a>
                 </li>
                 <li class="menu-item {% if active_page == 'codes' %}active{% endif %}">
@@ -46,7 +46,7 @@
                 <li class="menu-item {% if active_page == 'records' %}active{% endif %}">
                     <a href="/admin/records">
                         <span class="menu-icon" data-lucide="file-text"></span>
-                        <span class="menu-text">使用紀錄</span>
+                        <span class="menu-text">兌換紀錄</span>
                     </a>
                 </li>
                 <li class="menu-item {% if active_page == 'settings' %}active{% endif %}">
@@ -58,7 +58,7 @@
             </ul>
         </aside>
 
-        <!-- 主内容区 -->
+        <!-- 主內容區 -->
         <main class="main-content">
             {% block content %}{% endblock %}
         </main>
@@ -70,7 +70,7 @@
     </div>
     {% endif %}
 
-    <!-- 頁尾 -->
+    <!-- 頁腳 -->
     <footer class="footer">
         <p>&copy; 2026 GPT Team 管理系統 v0.1.0</p>
     </footer>
@@ -85,9 +85,9 @@
             <div class="modal-body">
                 <div class="modal-tabs">
                     <button class="modal-tab-btn active"
-                        onclick="switchModalTab('importTeamModal', 'singleImport')">單一匯入</button>
+                        onclick="switchModalTab('importTeamModal', 'singleImport')">單筆匯入</button>
                     <button class="modal-tab-btn"
-                        onclick="switchModalTab('importTeamModal', 'batchImport')">批次匯入</button>
+                        onclick="switchModalTab('importTeamModal', 'batchImport')">批量匯入</button>
                 </div>
 
                 <div id="singleImport" class="import-panel">
@@ -96,18 +96,18 @@
                             <label>Access Token (AT) <span class="required">*</span></label>
                             <textarea name="accessToken" class="form-control" rows="4"
                                 placeholder="eyJhbGciOiJSUzI1Ni..." required></textarea>
-                            <small class="form-text">必填項，以 eyJ 開頭的 JWT Token</small>
+                            <small class="form-text">必填，以 eyJ 開頭的 JWT Token</small>
                         </div>
                         <div class="form-group">
                             <label>電子郵件</label>
                             <input type="email" name="email" class="form-control" placeholder="admin@example.com">
-                            <small class="form-text">可選，若不填寫將從 Token 中自動擷取</small>
+                            <small class="form-text">選填，若不填將從 Token 自動擷取</small>
                         </div>
                         <div class="form-group">
                             <label>Account ID</label>
                             <input type="text" name="accountId" class="form-control"
                                 placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
-                            <small class="form-text">可選，若不填寫將從 API 自動取得</small>
+                            <small class="form-text">選填，若不填將由 API 自動取得</small>
                         </div>
                         <button type="submit" class="btn btn-primary">匯入</button>
                     </form>
@@ -116,15 +116,37 @@
                 <div id="batchImport" class="import-panel" style="display: none;">
                     <form id="batchImportForm" onsubmit="handleBatchImport(event)">
                         <div class="form-group">
-                            <label>批次匯入內容 <span class="required">*</span></label>
-                            <textarea name="batchContent" class="form-control" rows="8" placeholder="一行一個 AT Token..."
+                            <label>批量匯入內容 <span class="required">*</span></label>
+                            <textarea name="batchContent" class="form-control" rows="8" placeholder="每行一個 AT Token..."
                                 required></textarea>
                         </div>
+                        <div id="batchProgressContainer" style="display: none; margin-bottom: 1.5rem;">
+                            <div class="progress-info"
+                                style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.875rem;">
+                                <span id="batchProgressStage">準備中...</span>
+                                <span id="batchProgressPercent">0%</span>
+                            </div>
+                            <div class="progress-bar-bg"
+                                style="width: 100%; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden;">
+                                <div id="batchProgressBar"
+                                    style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width 0.3s ease;">
+                                </div>
+                            </div>
+                            <div id="batchProgressStats"
+                                style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-dim); display: flex; gap: 1rem;">
+                                <span>成功：<span id="batchSuccessCount" class="text-success">0</span></span>
+                                <span>失敗：<span id="batchFailedCount" class="text-danger">0</span></span>
+                            </div>
+                        </div>
                         <div id="batchResultsContainer" style="display: none; margin-bottom: 1rem;">
-                            <h4>匯入結果</h4>
+                            <div
+                                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                                <h4 style="margin: 0;">匯入明細</h4>
+                                <small id="batchFinalSummary" class="text-muted"></small>
+                            </div>
                             <div id="batchResults"></div>
                         </div>
-                        <button type="submit" class="btn btn-primary">批次匯入</button>
+                        <button type="submit" class="btn btn-primary">批量匯入</button>
                     </form>
                 </div>
             </div>
@@ -141,22 +163,29 @@
             <div class="modal-body">
                 <div class="modal-tabs">
                     <button class="modal-tab-btn active"
-                        onclick="switchModalTab('generateCodeModal', 'singleGenerate')">單一產生</button>
+                        onclick="switchModalTab('generateCodeModal', 'singleGenerate')">單筆產生</button>
                     <button class="modal-tab-btn"
-                        onclick="switchModalTab('generateCodeModal', 'batchGenerate')">批次產生</button>
+                        onclick="switchModalTab('generateCodeModal', 'batchGenerate')">批量產生</button>
                 </div>
 
                 <div id="singleGenerate" class="card-body">
                     <form onsubmit="generateSingle(event)">
                         <div class="form-group">
-                            <label>自訂兌換碼 (可選)</label>
+                            <label>自訂兌換碼（選填）</label>
                             <input type="text" name="customCode" class="form-control" placeholder="留空則自動產生"
                                 maxlength="32">
                         </div>
                         <div class="form-group">
-                            <label>有效期限 (天數, 可選)</label>
+                            <label>有效期（天數，選填）</label>
                             <input type="number" name="expiresDays" class="form-control" placeholder="留空則永久有效" min="1"
                                 max="3650">
+                        </div>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="hasWarranty" value="true" style="width: auto; margin: 0;">
+                                <span>保固兌換碼（一個月內可重複使用）</span>
+                            </label>
+                            <small class="form-text">保固兌換碼在首次使用後一個月內，若加入的 Team 被封鎖可重複使用</small>
                         </div>
                         <button type="submit" class="btn btn-primary">產生兌換碼</button>
                     </form>
@@ -177,15 +206,22 @@
                                 max="1000" required>
                         </div>
                         <div class="form-group">
-                            <label>有效期限 (天數, 可選)</label>
+                            <label>有效期（天數，選填）</label>
                             <input type="number" name="expiresDays" class="form-control" placeholder="留空則永久有效" min="1"
                                 max="3650">
                         </div>
-                        <button type="submit" class="btn btn-primary">批次產生</button>
+                        <div class="form-group">
+                            <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                                <input type="checkbox" name="hasWarranty" value="true" style="width: auto; margin: 0;">
+                                <span>保固兌換碼（一個月內可重複使用）</span>
+                            </label>
+                            <small class="form-text">保固兌換碼在首次使用後一個月內，若加入的 Team 被封鎖可重複使用</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">批量產生</button>
                     </form>
                     <div id="batchResult" class="result-box" style="display: none;">
-                        <h4>批次產生成功</h4>
-                        <p>成功產生 <strong id="batchTotal">0</strong> 組兌換碼</p>
+                        <h4>批量產生成功</h4>
+                        <p>成功產生 <strong id="batchTotal">0</strong> 個兌換碼</p>
                         <textarea id="batchCodes" readonly rows="5" class="form-control"
                             style="margin: 10px 0;"></textarea>
                         <button onclick="copyBatchCodes()" class="btn btn-sm btn-secondary">複製全部</button>
@@ -225,19 +261,19 @@
 
                 <!-- 已加入成員 -->
                 <div class="content-section" style="margin-bottom: 1.5rem;">
-                    <h4 style="margin-bottom: 1rem; color: var(--success);">已加入成員</h4>
+                    <h4 style="margin-bottom: 1rem; color: var(--success);">已加入會員</h4>
                     <div class="table-container" style="max-height: 250px; overflow-y: auto; margin: 0;">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>電子郵件</th>
+                                    <th>信箱</th>
                                     <th style="width: 100px;">角色</th>
                                     <th style="width: 160px;">加入時間</th>
                                     <th style="text-align: right; width: 100px;">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="modalJoinedMembersTableBody">
-                                <!-- 动态加载内容 -->
+                                <!-- 動態載入內容 -->
                             </tbody>
                         </table>
                     </div>
@@ -245,19 +281,19 @@
 
                 <!-- 待加入成員 -->
                 <div class="content-section" style="margin: 0;">
-                    <h4 style="margin-bottom: 1rem; color: var(--warning);">待加入成員（邀請中）</h4>
+                    <h4 style="margin-bottom: 1rem; color: var(--warning);">待加入成員 (邀請中)</h4>
                     <div class="table-container" style="max-height: 250px; overflow-y: auto; margin: 0;">
                         <table class="data-table">
                             <thead>
                                 <tr>
-                                    <th>電子郵件</th>
+                                    <th>信箱</th>
                                     <th style="width: 100px;">角色</th>
                                     <th style="width: 160px;">邀請時間</th>
                                     <th style="text-align: right; width: 100px;">操作</th>
                                 </tr>
                             </thead>
                             <tbody id="modalInvitedMembersTableBody">
-                                <!-- 动态加载内容 -->
+                                <!-- 動態載入內容 -->
                             </tbody>
                         </table>
                     </div>
@@ -275,3 +311,4 @@
 </body>
 
 </html>
+

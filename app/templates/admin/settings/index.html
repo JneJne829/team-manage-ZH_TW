@@ -7,7 +7,7 @@
     <h2>系統設定</h2>
 </div>
 
-<!-- 代理設定 -->
+<!-- Proxy 設定 -->
 <div class="content-section">
     <div class="section-header">
         <h3>代理設定</h3>
@@ -19,47 +19,48 @@
                 <input type="checkbox" id="proxyEnabled" name="enabled" {% if proxy_enabled %}checked{% endif %}>
                 <span>啟用代理</span>
             </label>
-            <p class="form-help">啟用後，所有 ChatGPT API 請求將透過代理伺服器</p>
+            <p class="form-help">啟用後，呼叫 ChatGPT API 時將透過此代理。</p>
         </div>
 
         <div class="form-group">
-            <label for="proxyUrl">代理地址</label>
+            <label for="proxyUrl">代理網址</label>
             <input type="text" id="proxyUrl" name="proxy" value="{{ proxy or '' }}"
-                placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080" class="form-control">
-            <p class="form-help">支援 HTTP 和 SOCKS5 代理，格式: http://host:port 或 socks5://host:port</p>
+                placeholder="http://127.0.0.1:7890 或 socks5://127.0.0.1:1080"
+                class="form-control">
+            <p class="form-help">支援 HTTP、SOCKS5、SOCKS5H (可解析 DNS)。</p>
         </div>
 
         <button type="submit" class="btn btn-primary">儲存代理設定</button>
     </form>
 </div>
 
-<!-- 密碼修改 -->
+<!-- 變更密碼 -->
 <div class="content-section">
     <div class="section-header">
-        <h3>修改密碼</h3>
+        <h3>變更密碼</h3>
     </div>
 
     <form id="passwordForm" class="settings-form">
         <div class="form-group">
             <label for="oldPassword">舊密碼</label>
             <input type="password" id="oldPassword" name="old_password" required class="form-control"
-                placeholder="請輸入當前密碼">
+                placeholder="請輸入目前密碼">
         </div>
 
         <div class="form-group">
             <label for="newPassword">新密碼</label>
             <input type="password" id="newPassword" name="new_password" required minlength="6" class="form-control"
-                placeholder="請輸入新密碼（至少6位）">
+                placeholder="至少 6 個字元">
         </div>
 
         <div class="form-group">
             <label for="confirmPassword">確認新密碼</label>
             <input type="password" id="confirmPassword" name="confirm_password" required minlength="6"
-                class="form-control" placeholder="請再次輸入新密碼">
+                class="form-control" placeholder="再次輸入新密碼">
         </div>
 
-        <button type="submit" class="btn btn-primary">修改密碼</button>
-        <p class="form-help">修改密碼後需要重新登入</p>
+        <button type="submit" class="btn btn-primary">更新密碼</button>
+        <p class="form-help">更新後需使用新密碼登入。</p>
     </form>
 </div>
 
@@ -73,161 +74,16 @@
         <div class="form-group">
             <label for="logLevel">日誌等級</label>
             <select id="logLevel" name="level" class="form-control">
-                <option value="DEBUG" {% if log_level=='DEBUG' %}selected{% endif %}>DEBUG - 除錯資訊</option>
-                <option value="INFO" {% if log_level=='INFO' %}selected{% endif %}>INFO - 一般資訊</option>
-                <option value="WARNING" {% if log_level=='WARNING' %}selected{% endif %}>WARNING - 警告資訊</option>
-                <option value="ERROR" {% if log_level=='ERROR' %}selected{% endif %}>ERROR - 錯誤資訊</option>
-                <option value="CRITICAL" {% if log_level=='CRITICAL' %}selected{% endif %}>CRITICAL - 嚴重錯誤</option>
+                <option value="DEBUG" {% if log_level=='DEBUG' %}selected{% endif %}>DEBUG - 除錯詳情</option>
+                <option value="INFO" {% if log_level=='INFO' %}selected{% endif %}>INFO - 基本資訊</option>
+                <option value="WARNING" {% if log_level=='WARNING' %}selected{% endif %}>WARNING - 警告</option>
+                <option value="ERROR" {% if log_level=='ERROR' %}selected{% endif %}>ERROR - 錯誤</option>
             </select>
-            <p class="form-help">調整系統日誌的詳細程度，DEBUG 等級會記錄最詳細的資訊</p>
         </div>
-
-        <button type="submit" class="btn btn-primary">儲存日誌等級</button>
+        <button type="submit" class="btn btn-primary">儲存等級</button>
     </form>
 </div>
 {% endblock %}
 
-{% block extra_css %}
-<style>
-    .search-form-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 1.25rem;
-        margin-top: 1rem;
-    }
-
-    .settings-form {
-        max-width: 600px;
-    }
-
-    .form-help {
-        font-size: 0.825rem;
-        color: var(--text-muted);
-        margin-top: 0.5rem;
-    }
-
-    .checkbox-label {
-        display: flex;
-        align-items: center;
-        cursor: pointer;
-        gap: 0.75rem;
-    }
-
-    .checkbox-label input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
-        cursor: pointer;
-    }
-</style>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-    // 代理設定表單
-    document.getElementById('proxyForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const enabled = document.getElementById('proxyEnabled').checked;
-        const proxy = document.getElementById('proxyUrl').value.trim();
-
-        // 驗證
-        if (enabled && !proxy) {
-            showToast('請輸入代理地址', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch('/admin/settings/proxy', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ enabled, proxy })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                showToast('代理設定已儲存', 'success');
-            } else {
-                showToast(data.error || '儲存失敗', 'error');
-            }
-        } catch (error) {
-            showToast('網路錯誤', 'error');
-        }
-    });
-
-    // 密碼修改表單
-    document.getElementById('passwordForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const oldPassword = document.getElementById('oldPassword').value;
-        const newPassword = document.getElementById('newPassword').value;
-        const confirmPassword = document.getElementById('confirmPassword').value;
-
-        // 驗證
-        if (newPassword.length < 6) {
-            showToast('新密碼至少 6 位', 'error');
-            return;
-        }
-
-        if (newPassword !== confirmPassword) {
-            showToast('兩次輸入的密碼不一致', 'error');
-            return;
-        }
-
-        try {
-            const response = await fetch('/auth/change-password', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    old_password: oldPassword,
-                    new_password: newPassword
-                })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                showToast('密碼修改成功，即將跳轉到登入頁', 'success');
-                setTimeout(() => {
-                    window.location.href = '/login';
-                }, 2000);
-            } else {
-                showToast(data.error || '修改失敗', 'error');
-            }
-        } catch (error) {
-            showToast('網路錯誤', 'error');
-        }
-    });
-
-    // 日誌等級表單
-    document.getElementById('logLevelForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const level = document.getElementById('logLevel').value;
-
-        try {
-            const response = await fetch('/admin/settings/log-level', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ level })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.success) {
-                showToast('日誌等級已儲存', 'success');
-            } else {
-                showToast(data.error || '儲存失敗', 'error');
-            }
-        } catch (error) {
-            showToast('網路錯誤', 'error');
-        }
-    });
-</script>
-{% endblock %}
+{% block extra_css %}{% endblock %}
+{% block extra_js %}{% endblock %}

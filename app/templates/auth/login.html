@@ -35,7 +35,7 @@ async function handleLogin(event) {
     const errorMessage = document.getElementById('errorMessage');
     const submitButton = event.target.querySelector('button[type="submit"]');
 
-    // 停用提交按鈕
+    // 禁用提交按鈕
     submitButton.disabled = true;
     submitButton.textContent = '登入中...';
     errorMessage.style.display = 'none';
@@ -52,17 +52,17 @@ async function handleLogin(event) {
         const data = await response.json();
 
         if (response.ok && data.success) {
-            // 登入成功，跳轉到管理員面板
+            // 登入成功,導向主控台
             window.location.href = '/admin';
         } else {
-            // 顯示錯誤資訊
+            // 顯示錯誤訊息
             errorMessage.textContent = data.error || '登入失敗';
             errorMessage.style.display = 'block';
             submitButton.disabled = false;
             submitButton.textContent = '登入';
         }
     } catch (error) {
-        errorMessage.textContent = '網路錯誤，請稍後重試';
+        errorMessage.textContent = '發生錯誤，請稍後再試';
         errorMessage.style.display = 'block';
         submitButton.disabled = false;
         submitButton.textContent = '登入';

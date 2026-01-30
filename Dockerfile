@@ -25,4 +25,4 @@ COPY . .
 EXPOSE 8008
 
 # 运行应用
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8008}"]

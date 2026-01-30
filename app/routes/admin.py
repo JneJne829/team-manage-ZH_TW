@@ -5,7 +5,8 @@
 import logging
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel, Field
 
@@ -13,6 +14,7 @@ from app.database import get_db
 from app.dependencies.auth import require_admin
 from app.services.team import TeamService
 from app.services.redemption import RedemptionService
+from app.utils.time_utils import get_now
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,8 @@ router = APIRouter(
     prefix="/admin",
     tags=["admin"]
 )
+
+import json
 
 # 服务实例
 team_service = TeamService()
@@ -48,45 +52,57 @@ class CodeGenerateRequest(BaseModel):
     code: Optional[str] = Field(None, description="自定义兑换码 (单个生成)")
     count: Optional[int] = Field(None, description="生成数量 (批量生成)")
     expires_days: Optional[int] = Field(None, description="有效期天数")
+    has_warranty: bool = Field(False, description="是否为质保兑换码")
+
+
+class TeamUpdateRequest(BaseModel):
+    """Team 更新请求"""
+    email: Optional[str] = Field(None, description="新邮箱")
+    account_id: Optional[str] = Field(None, description="新 Account ID")
+    access_token: Optional[str] = Field(None, description="新 Access Token")
+    max_members: Optional[int] = Field(None, description="最大成员数")
+    status: Optional[str] = Field(None, description="状态: active/full/expired/error/banned")
+
+
+class CodeUpdateRequest(BaseModel):
+    """兑换码更新请求"""
+    has_warranty: bool = Field(..., description="是否为质保兑换码")
 
 
 @router.get("/", response_class=HTMLResponse)
 async def admin_dashboard(
     request: Request,
+    page: int = 1,
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_admin)
 ):
     """
     管理员面板首页
-
-    Args:
-        request: FastAPI Request 对象
-        db: 数据库会话
-        current_user: 当前用户（需要登录）
-
-    Returns:
-        管理员面板首页 HTML
     """
     try:
-        # 导入模板引擎
         from app.main import templates
+        logger.info(f"管理员访问控制台, search={search}, page={page}")
 
-        logger.info("管理员访问控制台")
-
-        # 获取所有 Team 列表
-        teams_result = await team_service.get_all_teams(db)
-        teams = teams_result.get("teams", [])
-
-        # 获取兑换码统计
-        codes_result = await redemption_service.get_all_codes(db)
-        all_codes = codes_result.get("codes", [])
+        # 设置每页数量
+        per_page = 20
+        
+        # 获取 Team 列表 (分页)
+        teams_result = await team_service.get_all_teams(db, page=page, per_page=per_page, search=search)
+        
+        # 获取统计信息 (可以使用专用统计方法优化)
+        all_teams_result = await team_service.get_all_teams(db, page=1, per_page=10000)
+        all_teams = all_teams_result.get("teams", [])
+        
+        all_codes_result = await redemption_service.get_all_codes(db, page=1, per_page=10000)
+        all_codes = all_codes_result.get("codes", [])
 
         # 计算统计数据
         stats = {
-            "total_teams": len(teams),
-            "available_teams": len([t for t in teams if t["status"] == "active" and t["current_members"] < t["max_members"]]),
+            "total_teams": len(all_teams),
+            "available_teams": len([t for t in all_teams if t.get("status") == "active" and t.get("current_members", 0) < t.get("max_members", 6)]),
             "total_codes": len(all_codes),
-            "used_codes": len([c for c in all_codes if c["status"] == "used"])
+            "used_codes": len([c for c in all_codes if c.get("status") == "used"])
         }
 
         return templates.TemplateResponse(
@@ -95,13 +111,21 @@ async def admin_dashboard(
                 "request": request,
                 "user": current_user,
                 "active_page": "dashboard",
-                "teams": teams,
-                "stats": stats
+                "teams": teams_result.get("teams", []),
+                "stats": stats,
+                "search": search,
+                "pagination": {
+                    "current_page": teams_result.get("current_page", page),
+                    "total_pages": teams_result.get("total_pages", 1),
+                    "total": teams_result.get("total", 0),
+                    "per_page": per_page
+                }
             }
         )
-
     except Exception as e:
         logger.error(f"加载管理员面板失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"加载管理员面板失败: {str(e)}"
@@ -146,6 +170,59 @@ async def delete_team(
                 "success": False,
                 "error": f"删除 Team 失败: {str(e)}"
             }
+        )
+
+
+@router.get("/teams/{team_id}/info")
+async def get_team_info(
+    team_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_admin)
+):
+    """获取 Team 详情 (包含解密后的 Token)"""
+    try:
+        result = await team_service.get_team_by_id(team_id, db)
+        if not result["success"]:
+            return JSONResponse(
+                status_code=status.HTTP_404_NOT_FOUND,
+                content=result
+            )
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
+        )
+
+
+@router.post("/teams/{team_id}/update")
+async def update_team(
+    team_id: int,
+    update_data: TeamUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_admin)
+):
+    """更新 Team 信息"""
+    try:
+        result = await team_service.update_team(
+            team_id=team_id,
+            db_session=db,
+            email=update_data.email,
+            account_id=update_data.account_id,
+            access_token=update_data.access_token,
+            max_members=update_data.max_members,
+            status=update_data.status
+        )
+        if not result["success"]:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=result
+            )
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
         )
 
 
@@ -198,22 +275,18 @@ async def team_import(
             return JSONResponse(content=result)
 
         elif import_data.import_type == "batch":
-            # 批量导入
-            if not import_data.content:
-                return JSONResponse(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    content={
-                        "success": False,
-                        "error": "批量导入内容不能为空"
-                    }
-                )
+            # 批量导入使用 StreamingResponse
+            async def progress_generator():
+                async for status_item in team_service.import_team_batch(
+                    text=import_data.content,
+                    db_session=db
+                ):
+                    yield json.dumps(status_item, ensure_ascii=False) + "\n"
 
-            result = await team_service.import_team_batch(
-                text=import_data.content,
-                db_session=db
+            return StreamingResponse(
+                progress_generator(),
+                media_type="application/x-ndjson"
             )
-
-            return JSONResponse(content=result)
 
         else:
             return JSONResponse(
@@ -416,6 +489,8 @@ async def revoke_team_invite(
 @router.get("/codes", response_class=HTMLResponse)
 async def codes_list_page(
     request: Request,
+    page: int = 1,
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_admin)
 ):
@@ -424,6 +499,8 @@ async def codes_list_page(
 
     Args:
         request: FastAPI Request 对象
+        page: 页码
+        search: 搜索关键词
         db: 数据库会话
         current_user: 当前用户（需要登录）
 
@@ -433,15 +510,24 @@ async def codes_list_page(
     try:
         from app.main import templates
 
-        logger.info("管理员访问兑换码列表页面")
+        logger.info(f"管理员访问兑换码列表页面, search={search}")
 
-        # 获取所有兑换码
-        codes_result = await redemption_service.get_all_codes(db)
-        all_codes = codes_result.get("codes", [])
+        # 获取兑换码 (分页)
+        per_page = 50
+        codes_result = await redemption_service.get_all_codes(db, page=page, per_page=per_page, search=search)
+        codes = codes_result.get("codes", [])
+        total_codes = codes_result.get("total", 0)
+        total_pages = codes_result.get("total_pages", 1)
+        current_page = codes_result.get("current_page", 1)
+
+        # 为了统计数据，我们需要获取所有统计（或者增加统计接口）
+        # 这里暂时获取全部用于统计
+        all_codes_result = await redemption_service.get_all_codes(db, page=1, per_page=10000)
+        all_codes = all_codes_result.get("codes", [])
 
         # 计算统计数据
         stats = {
-            "total": len(all_codes),
+            "total": total_codes,
             "unused": len([c for c in all_codes if c["status"] == "unused"]),
             "used": len([c for c in all_codes if c["status"] == "used"]),
             "expired": len([c for c in all_codes if c["status"] == "expired"])
@@ -449,7 +535,7 @@ async def codes_list_page(
 
         # 格式化日期时间
         from datetime import datetime
-        for code in all_codes:
+        for code in codes:
             if code.get("created_at"):
                 dt = datetime.fromisoformat(code["created_at"])
                 code["created_at"] = dt.strftime("%Y-%m-%d %H:%M")
@@ -466,8 +552,15 @@ async def codes_list_page(
                 "request": request,
                 "user": current_user,
                 "active_page": "codes",
-                "codes": all_codes,
-                "stats": stats
+                "codes": codes,
+                "stats": stats,
+                "search": search,
+                "pagination": {
+                    "current_page": current_page,
+                    "total_pages": total_pages,
+                    "total": total_codes,
+                    "per_page": per_page
+                }
             }
         )
 
@@ -506,7 +599,8 @@ async def generate_codes(
             result = await redemption_service.generate_code_single(
                 db_session=db,
                 code=generate_data.code,
-                expires_days=generate_data.expires_days
+                expires_days=generate_data.expires_days,
+                has_warranty=generate_data.has_warranty
             )
 
             if not result["success"]:
@@ -531,7 +625,8 @@ async def generate_codes(
             result = await redemption_service.generate_code_batch(
                 db_session=db,
                 count=generate_data.count,
-                expires_days=generate_data.expires_days
+                expires_days=generate_data.expires_days,
+                has_warranty=generate_data.has_warranty
             )
 
             if not result["success"]:
@@ -605,6 +700,7 @@ async def delete_code(
 
 @router.get("/codes/export")
 async def export_codes(
+    search: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: dict = Depends(require_admin)
 ):
@@ -612,6 +708,7 @@ async def export_codes(
     导出兑换码为Excel文件
 
     Args:
+        search: 搜索关键词
         db: 数据库会话
         current_user: 当前用户（需要登录）
 
@@ -626,9 +723,11 @@ async def export_codes(
 
         logger.info("管理员导出兑换码为Excel")
 
-        # 获取所有兑换码
-        codes_result = await redemption_service.get_all_codes(db)
+        # 获取所有兑换码 (导出不分页，传入大数量)
+        codes_result = await redemption_service.get_all_codes(db, page=1, per_page=100000, search=search)
         all_codes = codes_result.get("codes", [])
+        
+        # 结果可能带统计信息，我们只取 codes
 
         # 创建Excel文件到内存
         output = BytesIO()
@@ -687,7 +786,7 @@ async def export_codes(
         output.close()
 
         # 生成文件名
-        filename = f"redemption_codes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filename = f"redemption_codes_{get_now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
         # 返回Excel文件
         return Response(
@@ -703,6 +802,33 @@ async def export_codes(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"导出失败: {str(e)}"
+        )
+
+
+@router.post("/codes/{code}/update")
+async def update_code(
+    code: str,
+    update_data: CodeUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(require_admin)
+):
+    """更新兑换码信息"""
+    try:
+        result = await redemption_service.update_code(
+            code=code,
+            db_session=db,
+            has_warranty=update_data.has_warranty
+        )
+        if not result["success"]:
+            return JSONResponse(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                content=result
+            )
+        return JSONResponse(content=result)
+    except Exception as e:
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"success": False, "error": str(e)}
         )
 
 
@@ -753,25 +879,18 @@ async def records_page(
             
         logger.info(f"管理员访问使用记录页面 (page={page_int})")
 
-        # 获取所有记录
-        records_result = await redemption_service.get_all_records(db)
+        # 获取记录 (支持邮箱、兑换码、Team ID 筛选)
+        records_result = await redemption_service.get_all_records(
+            db, 
+            email=email, 
+            code=code, 
+            team_id=actual_team_id
+        )
         all_records = records_result.get("records", [])
 
-        # 筛选记录
+        # 仅由于日期范围筛选目前还在内存中处理，如果未来记录数极大可以移至数据库
         filtered_records = []
         for record in all_records:
-            # 邮箱筛选
-            if email and email.lower() not in record["email"].lower():
-                continue
-
-            # 兑换码筛选
-            if code and code.lower() not in record["code"].lower():
-                continue
-
-            # Team ID 筛选
-            if actual_team_id is not None and record["team_id"] != actual_team_id:
-                continue
-
             # 日期范围筛选
             if start_date or end_date:
                 try:
@@ -802,7 +921,7 @@ async def records_page(
             record["team_name"] = team["team_name"] if team else None
 
         # 计算统计数据
-        now = datetime.now()
+        now = get_now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_start = today_start - timedelta(days=today_start.weekday())
         month_start = today_start.replace(day=1)
@@ -964,12 +1083,12 @@ async def update_proxy_config(
         # 验证代理地址格式
         if proxy_data.enabled and proxy_data.proxy:
             proxy = proxy_data.proxy.strip()
-            if not (proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks5://")):
+            if not (proxy.startswith("http://") or proxy.startswith("https://") or proxy.startswith("socks5://") or proxy.startswith("socks5h://")):
                 return JSONResponse(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     content={
                         "success": False,
-                        "error": "代理地址格式错误,应为 http://host:port 或 socks5://host:port"
+                        "error": "代理地址格式错误,应为 http://host:port, socks5://host:port 或 socks5h://host:port"
                     }
                 )
 
@@ -981,6 +1100,10 @@ async def update_proxy_config(
         )
 
         if success:
+            # 清理 ChatGPT 服务的会话,确保下次请求使用新代理
+            from app.services.chatgpt import chatgpt_service
+            await chatgpt_service.clear_session()
+            
             return JSONResponse(content={"success": True, "message": "代理配置已保存"})
         else:
             return JSONResponse(

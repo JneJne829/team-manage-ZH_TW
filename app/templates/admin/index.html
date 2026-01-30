@@ -1,19 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}控制台 - GPT Team 管理系統{% endblock %}
+{% block title %}主控台 - GPT Team 管理系統{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>控制台</h2>
+    <h2>主控台</h2>
 </div>
 
-<!-- 统计卡片 -->
+<!-- 指標卡 -->
 <div class="stats-container">
     <div class="stat-card">
         <div class="stat-icon"><i data-lucide="users"></i></div>
         <div class="stat-info-group">
             <div class="stat-value">{{ stats.total_teams }}</div>
-            <div class="stat-label">Team 總數</div>
+            <div class="stat-label">Team 數量</div>
         </div>
     </div>
     <div class="stat-card stat-success">
@@ -39,13 +39,27 @@
     </div>
 </div>
 
-<!-- Team 列表 -->
+<!-- Team 清單 -->
 <div class="content-section">
     <div class="section-header">
         <h3>Team 清單</h3>
-        <button onclick="showModal('importTeamModal')" class="btn btn-primary">
-            <i data-lucide="plus-circle"></i> 匯入 Team
-        </button>
+        <div class="header-group">
+            <form action="/admin" method="get" class="search-form">
+                <div class="input-group-clean">
+                    <i data-lucide="search" style="width: 14px; height: 14px;"></i>
+                    <input type="text" name="search" value="{{ search or '' }}" placeholder="搜尋 Email / Account ID..."
+                        style="width: 200px;">
+                    {% if search %}
+                    <a href="/admin" title="清除搜尋">
+                        <i data-lucide="x-circle" style="width: 14px; height: 14px;"></i>
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+            <button onclick="showModal('importTeamModal')" class="btn btn-primary">
+                <i data-lucide="plus-circle" style="width: 16px; height: 16px;"></i> 匯入 Team
+            </button>
+        </div>
     </div>
 
     {% if teams %}
@@ -54,12 +68,12 @@
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>電子郵件</th>
+                    <th>Email</th>
                     <th>Account ID</th>
                     <th>Team 名稱</th>
                     <th>成員數</th>
-                    <th>訂閱方案</th>
-                    <th>到期時間</th>
+                    <th>方案</th>
+                    <th>到期日</th>
                     <th>狀態</th>
                     <th>操作</th>
                 </tr>
@@ -91,24 +105,29 @@
                             {% elif team.status == 'full' %}
                             已滿
                             {% elif team.status == 'expired' %}
-                            已過期
+                            已到期
                             {% else %}
-                            異常
+                            錯誤
                             {% endif %}
                         </span>
                     </td>
                     <td>
                         <div class="action-buttons">
-                            <button onclick="viewMembers({{ team.id }}, '{{ team.email }}')" class="btn btn-sm btn-info"
-                                title="查看成員">
-                                <i data-lucide="users"></i> 成員
+                            <button class="btn btn-sm btn-icon btn-minimal btn-info btn-view-members"
+                                data-id="{{ team.id }}" data-email="{{ team.email }}" title="查看成員">
+                                <i data-lucide="users" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button onclick="refreshTeam({{ team.id }})" class="btn btn-sm btn-secondary" title="重新整理">
-                                <i data-lucide="refresh-cw"></i> 重新整理
+                            <button class="btn btn-sm btn-icon btn-minimal btn-primary btn-edit-team"
+                                data-id="{{ team.id }}" title="編輯">
+                                <i data-lucide="edit-3" style="width: 16px; height: 16px;"></i>
                             </button>
-                            <button onclick="deleteTeam({{ team.id }}, '{{ team.email|escape_js }}')"
-                                class="btn btn-sm btn-danger" title="刪除">
-                                <i data-lucide="trash-2"></i> 刪除
+                            <button class="btn btn-sm btn-icon btn-minimal btn-secondary btn-refresh-team"
+                                data-id="{{ team.id }}" title="重新整理">
+                                <i data-lucide="refresh-cw" style="width: 16px; height: 16px;"></i>
+                            </button>
+                            <button class="btn btn-sm btn-icon btn-minimal btn-danger btn-delete-team"
+                                data-id="{{ team.id }}" data-email="{{ team.email }}" title="刪除">
+                                <i data-lucide="trash-2" style="width: 16px; height: 16px;"></i>
                             </button>
                         </div>
                     </td>
@@ -117,63 +136,200 @@
             </tbody>
         </table>
     </div>
+
+    <!-- 分頁 -->
+    {% if pagination and pagination.total_pages > 1 %}
+    <div class="pagination">
+        {% set search_param = '&search=' + search if search else '' %}
+
+        {% if pagination.current_page > 1 %}
+        <a href="?page=1{{ search_param }}" class="btn btn-sm btn-secondary">第一頁</a>
+        <a href="?page={{ pagination.current_page - 1 }}{{ search_param }}" class="btn btn-sm btn-secondary">
+            <i data-lucide="chevron-left" style="width: 14px; height: 14px;"></i>
+        </a>
+        {% endif %}
+
+        <span class="pagination-info">第 {{ pagination.current_page }} / {{ pagination.total_pages }} 頁</span>
+
+        {% if pagination.current_page < pagination.total_pages %}
+        <a href="?page={{ pagination.current_page + 1 }}{{ search_param }}" class="btn btn-sm btn-secondary">
+            <i data-lucide="chevron-right" style="width: 14px; height: 14px;"></i>
+        </a>
+        <a href="?page={{ pagination.total_pages }}{{ search_param }}" class="btn btn-sm btn-secondary">最末頁</a>
+        {% endif %}
+    </div>
+    {% endif %}
     {% else %}
     <div class="empty-state">
-        <p>暫無 Team 資料</p>
+        <p>目前沒有 Team 資料</p>
         <button onclick="showModal('importTeamModal')" class="btn btn-primary">立即匯入</button>
     </div>
     {% endif %}
 </div>
+
+<!-- 編輯 Team Modal -->
+<div id="editTeamModal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>編輯 Team 資料</h3>
+            <button class="modal-close" onclick="hideModal('editTeamModal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="editTeamForm" onsubmit="handleEditTeam(event)">
+                <input type="hidden" id="edit-team-id" name="teamId">
+                <div class="form-group">
+                    <label>Email <span class="required">*</span></label>
+                    <input type="email" id="edit-team-email" name="email" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>Access Token (AT) <span class="required">*</span></label>
+                    <textarea id="edit-team-token" name="accessToken" class="form-control" rows="4" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Account ID <span class="required">*</span></label>
+                    <input type="text" id="edit-team-account-id" name="accountId" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>最大成員數 <span class="required">*</span></label>
+                    <input type="number" id="edit-team-max-members" name="maxMembers" class="form-control" min="1"
+                        max="100" required>
+                </div>
+                <div class="form-group">
+                    <label>狀態 <span class="required">*</span></label>
+                    <select id="edit-team-status" name="status" class="form-control" required>
+                        <option value="active">可用 (Active)</option>
+                        <option value="full">已滿 (Full)</option>
+                        <option value="expired">已到期 (Expired)</option>
+                        <option value="error">錯誤 (Error)</option>
+                        <option value="banned">封鎖 (Banned)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">儲存變更</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.btn-view-members').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const email = btn.getAttribute('data-email');
+                viewMembers(id, email);
+            });
+        });
+
+        document.querySelectorAll('.btn-refresh-team').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                refreshTeam(id);
+            });
+        });
+
+        document.querySelectorAll('.btn-delete-team').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                const email = btn.getAttribute('data-email');
+                deleteTeam(id, email);
+            });
+        });
+
+        document.querySelectorAll('.btn-edit-team').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.getAttribute('data-id');
+                editTeam(id);
+            });
+        });
+    });
 
     async function refreshTeam(teamId) {
-        if (!confirm('確定要重新整理此 Team 的資訊嗎？')) {
-            return;
-        }
-
+        if (!confirm('確定要重新整理此 Team 嗎？')) return;
         try {
-            showToast('正在重新整理...', 'info');
-            const response = await fetch(`/api/teams/${teamId}/refresh`, {
-                method: 'GET'
-            });
-
+            showToast('重新整理中...', 'info');
+            const response = await fetch(`/api/teams/${teamId}/refresh`, { method: 'GET' });
             const data = await response.json();
-
             if (response.ok && data.success) {
-                showToast('重新整理成功', 'success');
-                setTimeout(() => location.reload(), 1000);
+                showToast('重新整理完成', 'success');
+                setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.error || '重新整理失敗', 'error');
             }
         } catch (error) {
-            showToast('網路錯誤', 'error');
+            showToast('發生錯誤，請稍後再試', 'error');
         }
     }
 
     async function deleteTeam(teamId, email) {
-        if (!confirm(`確定要刪除 Team "${email}" 嗎？\n\n此操作無法復原！`)) {
-            return;
-        }
-
+        if (!confirm(`確定刪除 Team 「${email}」？\\n\\n此動作無法復原。`)) return;
         try {
-            showToast('正在刪除...', 'info');
-            const response = await fetch(`/admin/teams/${teamId}/delete`, {
-                method: 'POST'
-            });
-
+            showToast('刪除中...', 'info');
+            const response = await fetch(`/admin/teams/${teamId}/delete`, { method: 'POST' });
             const data = await response.json();
-
             if (response.ok && data.success) {
-                showToast('刪除成功', 'success');
-                setTimeout(() => location.reload(), 1000);
+                showToast('已刪除', 'success');
+                setTimeout(() => location.reload(), 800);
             } else {
                 showToast(data.error || '刪除失敗', 'error');
             }
         } catch (error) {
-            showToast('網路錯誤', 'error');
+            showToast('發生錯誤，請稍後再試', 'error');
+        }
+    }
+
+    async function editTeam(teamId) {
+        try {
+            const response = await fetch(`/admin/teams/${teamId}/info`);
+            const data = await response.json();
+            if (response.ok && data.success) {
+                const team = data.team;
+                document.getElementById('edit-team-id').value = team.id;
+                document.getElementById('edit-team-email').value = team.email;
+                document.getElementById('edit-team-token').value = team.access_token || '';
+                document.getElementById('edit-team-account-id').value = team.account_id || '';
+                document.getElementById('edit-team-max-members').value = team.max_members || 6;
+                document.getElementById('edit-team-status').value = team.status || 'active';
+                showModal('editTeamModal');
+            } else {
+                showToast(data.error || '載入資料失敗', 'error');
+            }
+        } catch (error) {
+            showToast('發生錯誤，請稍後再試', 'error');
+        }
+    }
+
+    async function handleEditTeam(event) {
+        event.preventDefault();
+        const teamId = document.getElementById('edit-team-id').value;
+        const payload = {
+            email: document.getElementById('edit-team-email').value,
+            access_token: document.getElementById('edit-team-token').value,
+            account_id: document.getElementById('edit-team-account-id').value,
+            max_members: parseInt(document.getElementById('edit-team-max-members').value),
+            status: document.getElementById('edit-team-status').value
+        };
+
+        try {
+            const response = await fetch(`/admin/teams/${teamId}/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                showToast('已更新', 'success');
+                hideModal('editTeamModal');
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast(result.error || '更新失敗', 'error');
+            }
+        } catch (error) {
+            showToast('發生錯誤，請稍後再試', 'error');
         }
     }
 </script>

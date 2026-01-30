@@ -123,19 +123,30 @@ class ChatGPTService:
 
                 # 4xx 客户端错误 (不重试)
                 if 400 <= status_code < 500:
+                    error_code = None
                     try:
                         error_data = response.json()
                         error_msg = error_data.get("detail", response.text)
+                        
+                        # 检测特定错误码
+                        if isinstance(error_data, dict):
+                            # 有些错误可能在 error 字段里
+                            error_info = error_data.get("error")
+                            if isinstance(error_info, dict):
+                                error_code = error_info.get("code")
+                            else:
+                                error_code = error_data.get("code")
                     except Exception:
                         error_msg = response.text
 
-                    logger.warning(f"客户端错误 {status_code}: {error_msg}")
+                    logger.warning(f"客户端错误 {status_code}: {error_msg} (code: {error_code})")
 
                     return {
                         "success": False,
                         "status_code": status_code,
                         "data": None,
-                        "error": error_msg
+                        "error": error_msg,
+                        "error_code": error_code
                     }
 
                 # 5xx 服务器错误 (需要重试)
@@ -501,6 +512,10 @@ class ChatGPTService:
             await self.session.close()
             self.session = None
             logger.info("HTTP 会话已关闭")
+
+    async def clear_session(self):
+        """清理当前会话 (别名,用于语义化调用)"""
+        await self.close()
 
 
 # 创建全局实例

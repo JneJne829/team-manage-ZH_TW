@@ -14,39 +14,23 @@
     <div class="container">
         <div class="header">
             <h1>GPT Team 付費群兌換</h1>
-            <p class="subtitle">使用兌換碼加入 ChatGPT Team 付費群</p>
+            <p class="subtitle">輸入兌換碼即可加入 ChatGPT Team</p>
             {% if remaining_spots is not none %}
             <div class="spots-badge">
-                <i data-lucide="users"></i> 剩餘名額：{{ remaining_spots }}
+                <i data-lucide="users"></i> 尚可加入：{{ remaining_spots }}
             </div>
             {% endif %}
         </div>
 
-
-        <style>
-            .spots-badge {
-                display: inline-flex;
-                align-items: center;
-                gap: 6px;
-                background: rgba(255, 255, 255, 0.1);
-                padding: 6px 12px;
-                border-radius: 20px;
-                font-size: 0.9rem;
-                color: var(--primary-light);
-                margin-top: 10px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-        </style>
-
-        <!-- 步驟1: 輸入兌換碼 -->
+        <!-- 步驟 1：驗證 -->
         <div id="step1" class="step active">
             <div class="card">
                 <h2>輸入兌換資訊</h2>
                 <form id="verifyForm">
                     <div class="form-group">
-                        <label for="email">電子郵件地址</label>
-                        <input type="email" id="email" name="email" required placeholder="請輸入您的電子郵件地址" class="form-input">
-                        <p class="form-help">請使用您的常用電子郵件，邀請將寄送到此信箱</p>
+                        <label for="email">電子郵件</label>
+                        <input type="email" id="email" name="email" required placeholder="請輸入您的 Email" class="form-input">
+                        <p class="form-help">後續通知與加入資訊將寄送至此 Email。</p>
                     </div>
 
                     <div class="form-group">
@@ -58,10 +42,38 @@
                         <i data-lucide="shield-check"></i> 驗證兌換碼
                     </button>
                 </form>
+
+                <!-- 保固查詢 -->
+                <div class="warranty-section" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid var(--border-base);">
+                    <h3 style="font-size: 1.1rem; margin-bottom: 15px; color: var(--text-primary);">
+                        <i data-lucide="shield" style="width: 18px; height: 18px; vertical-align: middle;"></i>
+                        保固查詢
+                    </h3>
+                    <p class="form-help" style="margin-bottom: 15px;">
+                        如果您使用保固期內的 Team 被封號，可以在保固期內（一個月）重複使用原兌換碼。
+                    </p>
+                    <div class="form-group" style="margin-bottom: 15px;">
+                        <input type="text" id="warrantyInput" placeholder="輸入兌換碼或 Email 進行查詢" class="form-input">
+                    </div>
+                    <button type="button" class="btn btn-secondary" id="checkWarrantyBtn" onclick="checkWarranty()" style="width: 100%;">
+                        <i data-lucide="search"></i> 查詢保固
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- 步驟2: 選擇 Team（已廢棄，保留佔位符防止 JS 報錯） -->
+        <!-- 保固查詢結果 -->
+        <div id="warrantyResult" class="step" style="display: none;">
+            <div class="card">
+                <h2>保固查詢結果</h2>
+                <div id="warrantyContent"></div>
+                <div class="actions" style="margin-top: 20px;">
+                    <button onclick="backToStep1()" class="btn btn-secondary">返回</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 步驟 2：選擇 Team -->
         <div id="step2" class="step" style="display: none;">
             <div class="card">
                 <h2>選擇 Team</h2>
@@ -73,20 +85,18 @@
             </div>
         </div>
 
-        <!-- 步驟3: 兌換結果 -->
+        <!-- 步驟 3：結果 -->
         <div id="step3" class="step">
             <div class="card">
-                <div id="resultContent">
-                    <!-- 結果內容將透過 JavaScript 動態生成 -->
-                </div>
+                <div id="resultContent"></div>
             </div>
         </div>
     </div>
 
-    <!-- Toast 提示 -->
+    <!-- Toast -->
     <div id="toast" class="toast"></div>
 
-    <!-- 系統公告彈出框 -->
+    <!-- 蝟餌絞公告彈出框 -->
     <div id="announcementOverlay" class="announcement-overlay" aria-hidden="true">
         <div class="announcement-card" role="dialog" aria-modal="true" aria-labelledby="announcementTitle">
             <button id="announcementClose" class="announcement-close" aria-label="關閉公告">
@@ -98,10 +108,12 @@
             </div>
             <h3 id="announcementTitle" class="announcement-title">付費群公告</h3>
             <p class="announcement-body">
-                本站屬於付費群，<br>請勿自行邀請用戶到被分配的工作區，後台有紀錄。<br>
+                本站屬於付費群，<br>
+                請勿自行邀請用戶到被分配的工作區，後台有紀錄。<br>
                 付費群承諾兌換的工作區可使用到工作區被停用，<br>
                 如果工作區被停用還需要使用，則需要重新購買兌換碼。<br>
-                若用量較大，可參考以下方案
+                或是購買有保固的兌換碼，保固時間為一個月。<br>
+                若用量較大，可參考以下方案：
             </p>
             <ul class="announcement-list">
                 <li class="announcement-plan">
@@ -111,7 +123,7 @@
                             <span class="plan-name">無限量使用群</span>
                             <span class="plan-price">$299 NT / 月</span>
                         </div>
-                        <div class="plan-desc">無限使用任何 GPT 模型包括 Codex 等</div>
+                        <div class="plan-desc">無限使用任何 GPT 模型包括 Codex 等。</div>
                     </div>
                 </li>
                 <li>
@@ -120,7 +132,7 @@
                 </li>
             </ul>
             <div class="announcement-meta plain">
-                <span class="meta-line"><i data-lucide="clock-3"></i> 更新時間：2026/01/30</span>
+                <span class="meta-line"><i data-lucide="clock-3"></i> 更新時間：2026/01/31</span>
                 <span class="meta-line"><i data-lucide="users"></i> 適用對象：付費群之使用者</span>
             </div>
             <div class="announcement-actions">
