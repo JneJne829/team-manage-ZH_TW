@@ -58,13 +58,6 @@ class TeamService:
                         "error": "无法从 Token 中提取邮箱,请手动提供邮箱"
                     }
 
-            # ?? user_id????? null/None ???? 404
-            if not user_id or str(user_id).lower() == "null":
-                return {
-                    "success": False,
-                    "message": None,
-                    "error": "????? ID"
-                }
 
             # 2. 调用 ChatGPT API 获取账户信息
             account_result = await self.chatgpt_service.get_account_info(
