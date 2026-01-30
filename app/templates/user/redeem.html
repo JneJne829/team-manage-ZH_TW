@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GPT Team 兌換</title>
+    <title>GPT Team 免費群兌換</title>
     <link rel="stylesheet" href="{{ url_for('static', path='/css/user.css') }}">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
@@ -13,8 +13,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>GPT Team 兌換</h1>
-            <p class="subtitle">使用兌換碼加入 ChatGPT Team</p>
+            <h1>GPT Team 免費群兌換</h1>
+            <p class="subtitle">使用兌換碼加入 ChatGPT Team 免費群</p>
             {% if remaining_spots is not none %}
             <div class="spots-badge">
                 <i data-lucide="users"></i> 剩餘名額：{{ remaining_spots }}
@@ -96,17 +96,46 @@
                 <i data-lucide="megaphone"></i>
                 <span>系統公告</span>
             </div>
-            <h3 id="announcementTitle" class="announcement-title">服務維護提醒（示範）</h3>
+            <h3 id="announcementTitle" class="announcement-title">免費群公告</h3>
             <p class="announcement-body">
-                這是一個測試用的公告彈窗，確保風格與頁面一致。您可以在這裡放入最新通知或系統訊息。
+                本站屬於免費公益群，<br>任何擁有兌換碼的人都可以使用兌換碼加入。
             </p>
-            <div class="announcement-meta">
-                <span><i data-lucide="clock-3"></i> 更新時間：2026/01/30 12:00</span>
-                <span><i data-lucide="users"></i> 影響範圍：所有使用者</span>
+            <ul class="announcement-list">
+                <li>
+                    <i data-lucide="alert-triangle"></i>
+                    <span>免費群可能不穩定，如需更穩定體驗請參考下方方案。</span>
+                </li>
+                <li class="announcement-plan">
+                    <i data-lucide="shield"></i>
+                    <div>
+                        <div class="plan-header">
+                            <span class="plan-name">穩定付費群</span>
+                            <span class="plan-price">$99 NT / 兌換碼</span>
+                        </div>
+                    </div>
+                </li>
+                <li class="announcement-plan">
+                    <i data-lucide="infinity"></i>
+                    <div>
+                        <div class="plan-header">
+                            <span class="plan-name">無限量使用群</span>
+                            <span class="plan-price">$299 NT / 月</span>
+                        </div>
+                        <div class="plan-desc">無限使用任何 GPT 模型包括 Codex 等</div>
+                    </div>
+                </li>
+                <li>
+                    <i data-lucide="message-circle"></i>
+                    <span>聯絡方式：Discord ID giam5145</span>
+                </li>
+            </ul>
+            <div class="announcement-meta plain">
+                <span class="meta-line"><i data-lucide="clock-3"></i> 更新時間：2026/01/30</span>
+                <span class="meta-line"><i data-lucide="users"></i> 適用對象：持有兌換碼之使用者</span>
             </div>
             <div class="announcement-actions">
                 <button id="announcementConfirm" class="btn btn-primary">
-                    <i data-lucide="check-circle-2"></i> 我知道了
+                    <i data-lucide="check-circle-2"></i> 我已閱讀，繼續兌換
                 </button>
             </div>
         </div>
