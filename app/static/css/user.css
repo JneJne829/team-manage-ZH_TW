@@ -586,6 +586,8 @@ body {
 .plan-price {
     color: #c084fc;
     font-weight: 700;
+    margin-left: auto;
+    text-align: right;
 }
 
 .plan-desc {
