@@ -29,7 +29,11 @@ class Team(Base):
 
     # 关系
     team_accounts = relationship("TeamAccount", back_populates="team", cascade="all, delete-orphan")
-    redemption_records = relationship("RedemptionRecord", back_populates="team")
+    redemption_records = relationship(
+        "RedemptionRecord",
+        back_populates="team",
+        cascade="all, delete-orphan"
+    )
 
     # 索引
     __table_args__ = (
@@ -86,7 +90,7 @@ class RedemptionRecord(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     email = Column(String(255), nullable=False, comment="用户邮箱")
     code = Column(String(32), ForeignKey("redemption_codes.code"), nullable=False, comment="兑换码")
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, comment="Team ID")
+    team_id = Column(Integer, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, comment="Team ID")
     account_id = Column(String(100), nullable=False, comment="Account ID")
     redeemed_at = Column(DateTime, server_default=func.now(), comment="兑换时间")
 
