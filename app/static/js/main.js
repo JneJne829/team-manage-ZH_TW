@@ -95,6 +95,11 @@ function confirmAction(message) {
 document.addEventListener('DOMContentLoaded', function () {
     // 檢查認證狀態
     checkAuthStatus();
+
+    const passwordForm = document.getElementById('passwordForm');
+    if (passwordForm) {
+        passwordForm.addEventListener('submit', handlePasswordChange);
+    }
 });
 
 // 檢查認證狀態
@@ -158,6 +163,60 @@ function switchModalTab(modalId, tabId) {
             panel.style.display = 'none';
         }
     });
+}
+
+// === 密碼修改邏輯 ===
+
+async function handlePasswordChange(event) {
+    event.preventDefault();
+    const form = event.target;
+    const oldPassword = form.old_password.value.trim();
+    const newPassword = form.new_password.value.trim();
+    const confirmPassword = form.confirm_password.value.trim();
+    const submitButton = form.querySelector('button[type="submit"]');
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+        showToast('請填寫完整密碼欄位', 'error');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        showToast('新密碼至少 6 碼', 'error');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        showToast('新密碼與確認密碼不一致', 'error');
+        return;
+    }
+
+    submitButton.disabled = true;
+    submitButton.textContent = '更新中...';
+
+    try {
+        const result = await apiCall('/auth/change-password', {
+            method: 'POST',
+            body: JSON.stringify({
+                old_password: oldPassword,
+                new_password: newPassword
+            })
+        });
+
+        if (result.success) {
+            showToast('密碼已更新，請重新登入', 'success');
+            form.reset();
+            setTimeout(() => {
+                window.location.href = '/login';
+            }, 1200);
+        } else {
+            showToast(result.error || '密碼更新失敗', 'error');
+        }
+    } catch (error) {
+        showToast('網路錯誤', 'error');
+    } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = '更新密碼';
+    }
 }
 
 // === Team 匯入邏輯 ===
