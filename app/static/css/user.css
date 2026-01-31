@@ -539,6 +539,14 @@ body {
         font-size: 0.78rem;
         line-height: 1.25;
     }
+
+    .plan-header--dual {
+        gap: 8px 12px;
+    }
+
+    .plan-header--dual .plan-price {
+        text-align: right;
+    }
 }
 
 .announcement-list {
@@ -577,6 +585,29 @@ body {
     align-items: baseline;
     gap: 10px;
     font-weight: 700;
+}
+
+.plan-header--dual {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 6px 12px;
+}
+
+.plan-header--dual .plan-name,
+.plan-header--dual .plan-price {
+    display: grid;
+    gap: 0px;
+}
+
+.plan-header--dual .plan-price {
+    text-align: right;
+    white-space: nowrap;
+}
+
+.plan-line,
+.price-line {
+    display: block;
 }
 
 .plan-name {
